@@ -85,7 +85,7 @@ export default function App() {
     return found ? `${found.flag} ${found.name}` : code;
   };
 
-  const playFallbackAudio = (text: string, langCode: string) => {
+  const playFallbackAudio = async (text: string, langCode: string) => {
     const langObj = LANGUAGES.find((l) => l.code === langCode);
     const tl = langObj?.tts || 'en';
     const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(
@@ -95,52 +95,92 @@ export default function App() {
     if (audioRef.current) {
       audioRef.current.pause();
     }
+
     const audio = new Audio(url);
+    audio.preload = 'auto';
     audioRef.current = audio;
 
-    audio.play().catch(() => {
-      setStatusNote('تعذر تشغيل الصوت؛ تأكد من الاتصال بالإنترنت أو من صوت الجهاز.');
-    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => resolve();
+        audio.onerror = () => reject(new Error('Audio playback failed'));
+
+        const playPromise = audio.play();
+        if (playPromise && typeof playPromise.then === 'function') {
+          playPromise.catch((err) => reject(err));
+        }
+      });
+    } catch {
+      setStatusNote(
+        'تعذر تشغيل الصوت في هذا الجهاز. تأكد من تفعيل حزمة تحويل النص إلى كلام (TTS) في إعدادات أندرويد ورفع صوت الوسائط.'
+      );
+    }
   };
 
-  const handleSpeak = (text: string, langCode: string) => {
-    if (!text) return;
+  const handleSpeak = async (text: string, langCode: string) => {
+    const cleanText = text.trim();
+    if (!cleanText) return;
+
     setStatusNote('');
 
     const langObj = LANGUAGES.find((l) => l.code === langCode);
-    const speechLang = langObj?.speech || langCode;
+    const speechLang = langObj?.speech || langCode || 'en-US';
+    const shortLang = speechLang.split('-')[0] || 'en';
 
-    if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
       try {
         window.speechSynthesis.cancel();
-        const utterance = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.resume();
+
+        const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = speechLang;
+        utterance.rate = 0.95;
 
-        let started = false;
-        utterance.onstart = () => {
-          started = true;
-        };
-        utterance.onerror = () => {
-          if (!started) {
-            playFallbackAudio(text, langCode);
-          }
-        };
+        const voices = window.speechSynthesis.getVoices();
+        const matchingVoice =
+          voices.find((v) => v.lang.toLowerCase() === speechLang.toLowerCase()) ||
+          voices.find((v) => v.lang.toLowerCase().startsWith(shortLang.toLowerCase()));
 
-        window.speechSynthesis.speak(utterance);
+        if (matchingVoice) {
+          utterance.voice = matchingVoice;
+        }
 
-        setTimeout(() => {
-          if (!started && !window.speechSynthesis.speaking) {
-            playFallbackAudio(text, langCode);
-          }
-        }, 450);
+        await new Promise<void>((resolve, reject) => {
+          let settled = false;
+
+          const timer = window.setTimeout(() => {
+            if (!settled) {
+              settled = true;
+              reject(new Error('TTS timeout'));
+            }
+          }, 5000);
+
+          utterance.onend = () => {
+            if (!settled) {
+              settled = true;
+              window.clearTimeout(timer);
+              resolve();
+            }
+          };
+
+          utterance.onerror = (event) => {
+            if (!settled) {
+              settled = true;
+              window.clearTimeout(timer);
+              reject(event);
+            }
+          };
+
+          window.speechSynthesis.speak(utterance);
+        });
+
         return;
       } catch {
-        playFallbackAudio(text, langCode);
-        return;
+        // ننتقل للحل البديل مباشرة
       }
     }
 
-    playFallbackAudio(text, langCode);
+    await playFallbackAudio(cleanText, langCode);
   };
 
   const handleCopy = (id: number, text: string) => {
