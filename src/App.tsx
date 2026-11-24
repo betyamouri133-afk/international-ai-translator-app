@@ -74,4 +74,5 @@ const SILENT_AUDIO =
   'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
 
 export default function App() {
-  const [langUser, setLangUser] = useState('ar-
+  const [langUser, setLangUser] = useState('ar-MA');
+
