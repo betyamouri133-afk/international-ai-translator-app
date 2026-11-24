@@ -1,78 +1,79 @@
-import React, { useState, useRef, useEffect } from 'react';
-import {
-  AdMob,
-  BannerAdOptions,
-  BannerAdSize,
-  BannerAdPosition,
-  AdOptions,
-} from '@capacitor-community/admob';
+import React, { useState } from 'react';
+import { Languages, Copy, Check, Volume2, Sparkles, ArrowLeftRight, Key, Settings } from 'lucide-react';
 
-// رابط السيرفر السحابي المعتمد للمشروع
 const API_BASE_URL = 'https://app-ash.vercel.app';
 
-// معرفات إعلانات Google AdMob التجريبية الرسمية (استبدلها بمعرفاتك الحقيقية عند النشر في Google Play)
-const ADMOB_BANNER_ID = 'ca-app-pub-3940256099942544/6300978111';
-const ADMOB_INTERSTITIAL_ID = 'ca-app-pub-3940256099942544/1033173712';
-
-interface Message {
-  id: string;
-  sender: 'user' | 'guest';
-  text: string;
-  translation: string;
-  timestamp: string;
-  sourceLang: string;
-  targetLang: string;
-}
-
-interface ConversationSession {
-  id: string;
-  date: string;
-  messages: Message[];
-}
-
-const ALL_LANGUAGES = [
-  { code: 'ar-MA', label: '🇲🇦 الدارجة المغربية', promptName: 'Moroccan Darija (Arabic script only)' },
-  { code: 'ar-SA', label: '🇸🇦 اللهجة الخليجية', promptName: 'Gulf Arabic dialect (Khaleeji, Arabic script only)' },
-  { code: 'ar-EG', label: '🇪🇬 اللهجة المصرية', promptName: 'Egyptian Arabic dialect (Masri, Arabic script only)' },
-  { code: 'ar-LB', label: '🇱🇧 اللهجة الشامية', promptName: 'Levantine Arabic dialect (Arabic script only)' },
-  { code: 'ar-001', label: '🌍 العربية الفصحى', promptName: 'Modern Standard Arabic' },
-
-  { code: 'ja-JP', label: '🇯🇵 اليابانية (日本語)', promptName: 'Japanese' },
-  { code: 'ko-KR', label: '🇰🇷 الكورية (한국어)', promptName: 'Korean' },
-  { code: 'hi-IN', label: '🇮🇳 الهندية (हिन्दी)', promptName: 'Hindi' },
-  { code: 'zh-CN', label: '🇨🇳 الصينية المبسطة (简体中文)', promptName: 'Simplified Mandarin Chinese' },
-  { code: 'zh-TW', label: '🇹🇼 الصينية التقليدية (繁體中文)', promptName: 'Traditional Chinese' },
-  { code: 'ur-PK', label: '🇵🇰 الأردية (اردو)', promptName: 'Urdu' },
-  { code: 'id-ID', label: '🇮🇩 الإندونيسية (Bahasa Indonesia)', promptName: 'Indonesian' },
-  { code: 'ms-MY', label: '🇲🇾 الملايوية (Bahasa Melayu)', promptName: 'Malay' },
-  { code: 'th-TH', label: '🇹🇭 التايلاندية (ไทย)', promptName: 'Thai' },
-  { code: 'vi-VN', label: '🇻🇳 الفيتنامية (Tiếng Việt)', promptName: 'Vietnamese' },
-  { code: 'fil-PH', label: '🇵🇭 الفلبينية (Tagalog)', promptName: 'Filipino Tagalog' },
-  { code: 'bn-BD', label: '🇧🇩 البنغالية (বাংলা)', promptName: 'Bengali' },
-
-  { code: 'en-US', label: '🇺🇸 الإنجليزية (English)', promptName: 'English' },
-  { code: 'fr-FR', label: '🇫🇷 الفرنسية (Français)', promptName: 'French' },
-  { code: 'es-ES', label: '🇪🇸 الإسبانية (Español)', promptName: 'Spanish' },
-  { code: 'tr-TR', label: '🇹🇷 التركية (Türkçe)', promptName: 'Turkish' },
-  { code: 'nl-NL', label: '🇳🇱 الهولندية (Nederlands)', promptName: 'Dutch' },
-  { code: 'pt-PT', label: '🇵🇹 البرتغالية (Português)', promptName: 'Portuguese' },
-  { code: 'de-DE', label: '🇩🇪 الألمانية (Deutsch)', promptName: 'German' },
-  { code: 'it-IT', label: '🇮🇹 الإيطالية (Italiano)', promptName: 'Italian' },
-  { code: 'ru-RU', label: '🇷🇺 الروسية (Русский)', promptName: 'Russian' },
-  { code: 'uk-UA', label: '🇺🇦 الأوكرانية (Українська)', promptName: 'Ukrainian' },
-  { code: 'pl-PL', label: '🇵🇱 البولندية (Polski)', promptName: 'Polish' },
-  { code: 'sv-SE', label: '🇸🇪 السويدية (Svenska)', promptName: 'Swedish' },
-  { code: 'el-GR', label: '🇬🇷 اليونانية (Ελληνικά)', promptName: 'Greek' },
-  { code: 'ro-RO', label: '🇷🇴 الرومانية (Română)', promptName: 'Romanian' },
-  { code: 'fa-IR', label: '🇮🇷 الفارسية (فارسی)', promptName: 'Persian' },
-
-  { code: 'sw-KE', label: '🇰🇪 السواحيلية (Kiswahili)', promptName: 'Swahili' },
-  { code: 'ha-NG', label: '🇳🇬 الهوسا (Hausa)', promptName: 'Hausa' },
+const LANGUAGES = [
+  { code: 'ar-MA', name: 'الدارجة المغربية' },
+  { code: 'ar', name: 'العربية الفصحى' },
+  { code: 'fr', name: 'الفرنسية (Français)' },
+  { code: 'en', name: 'الإنجليزية (English)' },
+  { code: 'es', name: 'الإسبانية (Español)' },
+  { code: 'de', name: 'الألمانية (Deutsch)' },
+  { code: 'it', name: 'الإيطالية (Italiano)' },
+  { code: 'tr', name: 'التركية (Türkçe)' },
 ];
 
-const SILENT_AUDIO =
-  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
-
 export default function App() {
-  const [langUser, setLangUser] = useState('ar-MA');
+  const [sourceText, setSourceText] = useState('');
+  const [translatedText, setTranslatedText] = useState('');
+  const [sourceLang, setSourceLang] = useState('ar-MA');
+  const [targetLang, setTargetLang] = useState('fr');
+  const [isLoading, setIsLoading] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('openai_api_key') || '');
+  const [showSettings, setShowSettings] = useState(false);
+  const [error, setError] = useState('');
 
+  const handleSaveKey = (val: string) => {
+    setApiKey(val);
+    localStorage.setItem('openai_api_key', val);
+  };
+
+  const handleSwapLanguages = () => {
+    setSourceLang(targetLang);
+    setTargetLang(sourceLang);
+    setSourceText(translatedText);
+    setTranslatedText(sourceText);
+  };
+
+  const handleTranslate = async () => {
+    if (!sourceText.trim()) return;
+    setError('');
+    setIsLoading(true);
+
+    const srcName = LANGUAGES.find((l) => l.code === sourceLang)?.name || sourceLang;
+    const tgtName = LANGUAGES.find((l) => l.code === targetLang)?.name || targetLang;
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/translate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
+        },
+        body: JSON.stringify({
+          text: sourceText,
+          sourceLang,
+          targetLang,
+          srcName,
+          tgtName,
+        }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error?.message || data.message || 'تعذر الاتصال بالخادم.');
+      }
+
+      const result = data.translatedText || data.result || data.choices?.[0]?.message?.content || '';
+      setTranslatedText(String(result).trim());
+    } catch (err: any) {
+      setError(err?.message || 'تعذر الاتصال بالخادم.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleCopy = () => {
+    if (!
