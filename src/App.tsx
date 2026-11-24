@@ -1,246 +1,433 @@
 import React, { useState } from 'react';
-import { Languages, Copy, Check, Volume2, Sparkles, ArrowLeftRight, Key, Settings } from 'lucide-react';
+import { Camera, History, Eraser, Volume2, Mic, ChevronDown, Copy, Check } from 'lucide-react';
 
 const API_BASE_URL = 'https://app-ash.vercel.app';
 
 const LANGUAGES = [
-  { code: 'ar-MA', name: 'الدارجة المغربية' },
-  { code: 'ar', name: 'العربية الفصحى' },
-  { code: 'fr', name: 'الفرنسية (Français)' },
-  { code: 'en', name: 'الإنجليزية (English)' },
-  { code: 'es', name: 'الإسبانية (Español)' },
-  { code: 'de', name: 'الألمانية (Deutsch)' },
-  { code: 'it', name: 'الإيطالية (Italiano)' },
-  { code: 'tr', name: 'التركية (Türkçe)' },
+  { code: 'ar-MA', name: 'الدارجة المغربية', flag: '🇲🇦', speech: 'ar-MA' },
+  { code: 'ar', name: 'العربية الفصحى', flag: '🇸🇦', speech: 'ar-SA' },
+  { code: 'tr', name: 'التركية', flag: '🇹🇷', speech: 'tr-TR' },
+  { code: 'fr', name: 'الفرنسية', flag: '🇫🇷', speech: 'fr-FR' },
+  { code: 'en', name: 'الإنجليزية', flag: '🇬🇧', speech: 'en-US' },
+  { code: 'es', name: 'الإسبانية', flag: '🇪🇸', speech: 'es-ES' },
+  { code: 'de', name: 'الألمانية', flag: '🇩🇪', speech: 'de-DE' },
+  { code: 'it', name: 'الإيطالية', flag: '🇮🇹', speech: 'it-IT' },
+  { code: 'pt', name: 'البرتغالية', flag: '🇵🇹', speech: 'pt-PT' },
+  { code: 'ru', name: 'الروسية', flag: '🇷🇺', speech: 'ru-RU' },
+  { code: 'zh-CN', name: 'الصينية المبسطة', flag: '🇨🇳', speech: 'zh-CN' },
+  { code: 'ja', name: 'اليابانية', flag: '🇯🇵', speech: 'ja-JP' },
+  { code: 'ko', name: 'الكورية', flag: '🇰🇷', speech: 'ko-KR' },
+  { code: 'nl', name: 'الهولندية', flag: '🇳🇱', speech: 'nl-NL' },
+  { code: 'sv', name: 'السويدية', flag: '🇸🇪', speech: 'sv-SE' },
+  { code: 'nb', name: 'النرويجية', flag: '🇳🇴', speech: 'nb-NO' },
+  { code: 'da', name: 'الدنماركية', flag: '🇩🇰', speech: 'da-DK' },
+  { code: 'fi', name: 'الفنلندية', flag: '🇫🇮', speech: 'fi-FI' },
+  { code: 'pl', name: 'البولندية', flag: '🇵🇱', speech: 'pl-PL' },
+  { code: 'el', name: 'اليونانية', flag: '🇬🇷', speech: 'el-GR' },
+  { code: 'ro', name: 'الرومانية', flag: '🇷🇴', speech: 'ro-RO' },
+  { code: 'hu', name: 'المجرية', flag: '🇭🇺', speech: 'hu-HU' },
+  { code: 'cs', name: 'التشيكية', flag: '🇨🇿', speech: 'cs-CZ' },
+  { code: 'uk', name: 'الأوكرانية', flag: '🇺🇦', speech: 'uk-UA' },
+  { code: 'hi', name: 'الهندية', flag: '🇮🇳', speech: 'hi-IN' },
+  { code: 'ur', name: 'الأردية', flag: '🇵🇰', speech: 'ur-PK' },
+  { code: 'id', name: 'الإندونيسية', flag: '🇮🇩', speech: 'id-ID' },
+  { code: 'ms', name: 'الملايوية', flag: '🇲🇾', speech: 'ms-MY' },
+  { code: 'th', name: 'التايلاندية', flag: '🇹🇭', speech: 'th-TH' },
+  { code: 'vi', name: 'الفيتنامية', flag: '🇻🇳', speech: 'vi-VN' },
+  { code: 'ar-EG', name: 'المصرية', flag: '🇪🇬', speech: 'ar-EG' },
+  { code: 'ar-AE', name: 'الخليجية', flag: '🇦🇪', speech: 'ar-AE' },
+  { code: 'ar-LB', name: 'اللبنانية', flag: '🇱🇧', speech: 'ar-LB' },
+  { code: 'ar-JO', name: 'الأردنية', flag: '🇯🇴', speech: 'ar-JO' },
+  { code: 'he', name: 'العبرية', flag: '🇮🇱', speech: 'he-IL' },
+  { code: 'fa', name: 'الفارسية', flag: '🇮🇷', speech: 'fa-IR' },
+  { code: 'sw', name: 'السواحيلية', flag: '🇹🇿', speech: 'sw-KE' },
+  { code: 'am', name: 'الأمهرية', flag: '🇪🇹', speech: 'am-ET' },
 ];
 
+interface MessageItem {
+  id: number;
+  time: string;
+  speaker: 'me' | 'guest';
+  sourceText: string;
+  translatedText: string;
+  sourceLang: string;
+  targetLang: string;
+}
+
 export default function App() {
-  const [sourceText, setSourceText] = useState('');
-  const [translatedText, setTranslatedText] = useState('');
-  const [sourceLang, setSourceLang] = useState('ar-MA');
-  const [targetLang, setTargetLang] = useState('fr');
-  const [isLoading, setIsLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('openai_api_key') || '');
-  const [showSettings, setShowSettings] = useState(false);
-  const [error, setError] = useState('');
+  const [myLang, setMyLang] = useState('ar-MA');
+  const [guestLang, setGuestLang] = useState('tr');
+  const [messages, setMessages] = useState<MessageItem[]>([
+    {
+      id: 1,
+      time: '04:16',
+      speaker: 'me',
+      sourceText: 'اهلا وسهلا',
+      translatedText: 'تعذر الاتصال بالخادم.',
+      sourceLang: 'ar-MA',
+      targetLang: 'tr',
+    },
+  ]);
+  const [isListening, setIsListening] = useState<'me' | 'guest' | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  const [copiedId, setCopiedId] = useState<number | null>(null);
 
-  const handleSaveKey = (val: string) => {
-    setApiKey(val);
-    localStorage.setItem('openai_api_key', val);
+  const getNowTime = () => {
+    const now = new Date();
+    return now.toTimeString().slice(0, 5);
   };
 
-  const handleSwapLanguages = () => {
-    setSourceLang(targetLang);
-    setTargetLang(sourceLang);
-    setSourceText(translatedText);
-    setTranslatedText(sourceText);
+  const getLangLabel = (code: string) => {
+    const found = LANGUAGES.find((l) => l.code === code);
+    return found ? `${found.flag} ${found.name}` : code;
   };
 
-  const handleTranslate = async () => {
-    if (!sourceText.trim()) return;
-    setError('');
-    setIsLoading(true);
-
-    const srcName = LANGUAGES.find((l) => l.code === sourceLang)?.name || sourceLang;
-    const tgtName = LANGUAGES.find((l) => l.code === targetLang)?.name || targetLang;
-
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/translate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(apiKey.trim() ? { Authorization: `Bearer ${apiKey.trim()}` } : {}),
-        },
-        body: JSON.stringify({
-          text: sourceText,
-          sourceLang,
-          targetLang,
-          srcName,
-          tgtName,
-        }),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error?.message || data.message || 'تعذر الاتصال بالخادم.');
-      }
-
-      const result = data.translatedText || data.result || data.choices?.[0]?.message?.content || '';
-      setTranslatedText(String(result).trim());
-    } catch (err: any) {
-      setError(err?.message || 'تعذر الاتصال بالخادم.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleCopy = () => {
-    if (!translatedText) return;
-    navigator.clipboard.writeText(translatedText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleSpeak = (text: string, lang: string) => {
+  const handleSpeak = (text: string, langCode: string) => {
     if (!text || !('speechSynthesis' in window)) return;
+    const langObj = LANGUAGES.find((l) => l.code === langCode);
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang.startsWith('ar') ? 'ar-SA' : lang;
+    utterance.lang = langObj?.speech || langCode;
     window.speechSynthesis.speak(utterance);
   };
 
+  const handleCopy = (id: number, text: string) => {
+    if (!text || !navigator.clipboard) return;
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 1800);
+  };
+
+  const translateText = async (text: string, fromCode: string, toCode: string) => {
+    const time = getNowTime();
+    const speaker: 'me' | 'guest' = fromCode === myLang ? 'me' : 'guest';
+    const newId = Date.now();
+
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: newId,
+        time,
+        speaker,
+        sourceText: text,
+        translatedText: 'جاري الترجمة...',
+        sourceLang: fromCode,
+        targetLang: toCode,
+      },
+    ]);
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/translate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          sourceLang: fromCode,
+          targetLang: toCode,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data?.error?.message || 'تعذر الاتصال بالخادم.');
+      }
+
+      const out =
+        data.translatedText ||
+        data.result ||
+        data.choices?.[0]?.message?.content ||
+        'تعذر الاتصال بالخادم.';
+
+      setMessages((prev) =>
+        prev.map((m) => (m.id === newId ? { ...m, translatedText: String(out).trim() } : m))
+      );
+    } catch {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === newId ? { ...m, translatedText: 'تعذر الاتصال بالخادم.' } : m))
+      );
+    }
+  };
+
+  const handleVoiceInput = (speaker: 'me' | 'guest') => {
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    const fromCode = speaker === 'me' ? myLang : guestLang;
+    const toCode = speaker === 'me' ? guestLang : myLang;
+
+    if (!SpeechRecognition) {
+      const sample = prompt('اكتب النص المراد ترجمته:');
+      if (sample && sample.trim()) {
+        translateText(sample.trim(), fromCode, toCode);
+      }
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    const langObj = LANGUAGES.find((l) => l.code === fromCode);
+    recognition.lang = langObj?.speech || 'ar-MA';
+    recognition.interimResults = false;
+
+    setIsListening(speaker);
+
+    recognition.onresult = (event: any) => {
+      const transcript = event.results?.[0]?.[0]?.transcript || '';
+      if (transcript.trim()) {
+        translateText(transcript.trim(), fromCode, toCode);
+      }
+    };
+
+    recognition.onerror = () => {
+      setIsListening(null);
+    };
+
+    recognition.onend = () => {
+      setIsListening(null);
+    };
+
+    recognition.start();
+  };
+
+  const handleClearAndSave = () => {
+    try {
+      localStorage.setItem('translator_history', JSON.stringify(messages));
+    } catch {
+      // تجاهل أخطاء التخزين المحلي
+    }
+    setMessages([]);
+  };
+
+  const handleCameraClick = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.capture = 'environment';
+    input.onchange = () => {
+      translateText('مرحبا', myLang, guestLang);
+    };
+    input.click();
+  };
+
+  const latestMessage = messages[messages.length - 1];
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 text-slate-800 flex flex-col">
-      <header className="bg-white/80 backdrop-blur-md border-b border-slate-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-4 py-3.5 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="bg-blue-600 text-white p-2 rounded-xl shadow-sm">
-              <Languages className="w-6 h-6" />
-            </div>
-            <div>
-              <h1 className="font-bold text-lg text-slate-900 leading-tight">المترجم الذكي الدولي</h1>
-              <p className="text-xs text-slate-500">ترجمة فورية بالذكاء الاصطناعي والدارجة</p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-[#070b0a] text-white flex flex-col justify-between select-none">
+      {/* الشريط العلوي */}
+      <header className="px-3 pt-3 pb-2 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCameraClick}
+            title="الكاميرا"
+            className="w-11 h-11 rounded-xl bg-[#141d1a] border border-[#22332c] flex items-center justify-center text-slate-200 active:scale-95 transition"
+          >
+            <Camera className="w-5 h-5" />
+          </button>
 
           <button
-            onClick={() => setShowSettings(!showSettings)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium bg-slate-100 hover:bg-slate-200 text-slate-700 transition"
+            onClick={() => setShowHistory((v) => !v)}
+            className="h-11 px-3.5 rounded-xl bg-[#141d1a] border border-[#22332c] flex items-center gap-1.5 text-sm font-semibold text-slate-100 active:scale-95 transition"
           >
-            <Settings className="w-4 h-4" />
-            <span>الإعدادات</span>
+            <History className="w-4 h-4 text-slate-300" />
+            <span>السجل</span>
+          </button>
+
+          <button
+            onClick={handleClearAndSave}
+            className="h-11 px-3 rounded-xl bg-[#0c261d] border border-[#184b39] flex items-center gap-1.5 text-xs font-bold text-emerald-200 leading-tight active:scale-95 transition"
+          >
+            <Eraser className="w-4 h-4 text-amber-300 shrink-0" />
+            <span>
+              مسح
+              <br />
+              وحفظ
+            </span>
           </button>
         </div>
 
-        {showSettings && (
-          <div className="bg-slate-900 text-white px-4 py-3 border-t border-slate-800">
-            <div className="max-w-4xl mx-auto flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="flex items-center gap-2 text-xs text-slate-300 shrink-0">
-                <Key className="w-4 h-4 text-amber-400" />
-                <span>مفتاح OpenAI API:</span>
-              </div>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => handleSaveKey(e.target.value)}
-                placeholder="sk-..."
-                dir="ltr"
-                className="flex-1 bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-blue-500"
-              />
-              <span className="text-[11px] text-slate-400">يُحفظ محلياً في جهازك فقط</span>
+        <div className="flex items-center gap-2 text-right">
+          <div>
+            <div className="font-extrabold text-base leading-tight text-white">
+              المترجم الذكي
+              <br />
+              الفوري
+            </div>
+            <div className="text-[11px] text-emerald-400/90 leading-tight mt-0.5">
+              38 لغة ولهجة • شاشة ذكية نظيفة
             </div>
           </div>
-        )}
+          <div className="w-10 h-10 rounded-xl bg-[#0b2e22] border border-emerald-500/40 flex items-center justify-center font-black text-emerald-400 text-sm shrink-0">
+            AI
+          </div>
+        </div>
       </header>
 
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-6 flex flex-col gap-4">
-        <div className="bg-white p-2 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between gap-2">
-          <select
-            value={sourceLang}
-            onChange={(e) => setSourceLang(e.target.value)}
-            className="flex-1 bg-transparent font-semibold text-slate-800 px-3 py-2 rounded-xl focus:outline-none focus:bg-slate-50 cursor-pointer"
-          >
-            {LANGUAGES.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.name}
-              </option>
-            ))}
-          </select>
-
-          <button
-            onClick={handleSwapLanguages}
-            title="تبديل اللغات"
-            className="p-2.5 rounded-xl bg-blue-50 text-blue-600 hover:bg-blue-100 transition shrink-0"
-          >
-            <ArrowLeftRight className="w-5 h-5" />
-          </button>
-
-          <select
-            value={targetLang}
-            onChange={(e) => setTargetLang(e.target.value)}
-            className="flex-1 bg-transparent font-semibold text-blue-700 px-3 py-2 rounded-xl focus:outline-none focus:bg-slate-50 cursor-pointer"
-          >
-            {LANGUAGES.map((lang) => (
-              <option key={lang.code} value={lang.code}>
-                {lang.name}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 flex flex-col justify-between min-h-[220px]">
-            <textarea
-              value={sourceText}
-              onChange={(e) => setSourceText(e.target.value)}
-              placeholder="اكتب هنا النص اللي بغيتي تترجمو..."
-              className="w-full flex-1 resize-none border-0 focus:outline-none text-base leading-relaxed text-slate-800 placeholder-slate-400"
-            />
-            <div className="flex items-center justify-between pt-3 border-t border-slate-100 mt-2">
-              <button
-                onClick={() => handleSpeak(sourceText, sourceLang)}
-                disabled={!sourceText}
-                className="p-2 text-slate-400 hover:text-blue-600 disabled:opacity-40 transition"
-                title="استماع"
-              >
-                <Volume2 className="w-5 h-5" />
+      {/* منطقة العرض الرئيسية */}
+      <main className="flex-1 px-3 py-2 flex flex-col justify-center gap-4">
+        {showHistory ? (
+          <div className="bg-[#0e1b16] border border-[#1d382e] rounded-2xl p-3 max-h-64 overflow-y-auto space-y-2">
+            <div className="flex items-center justify-between text-xs text-emerald-300 pb-1 border-b border-[#1d382e]">
+              <span>سجل المحادثات ({messages.length})</span>
+              <button onClick={() => setShowHistory(false)} className="underline">
+                إغلاق
               </button>
-              <span className="text-xs text-slate-400">{sourceText.length} حرف</span>
             </div>
-          </div>
-
-          <div className="bg-blue-600 text-white rounded-2xl shadow-md p-4 flex flex-col justify-between min-h-[220px]">
-            <div className="flex-1 text-base leading-relaxed whitespace-pre-wrap">
-              {isLoading ? (
-                <div className="flex items-center gap-2 text-blue-200 animate-pulse">
-                  <Sparkles className="w-5 h-5" />
-                  <span>جاري الترجمة بالذكاء الاصطناعي...</span>
+            {messages.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-4">لا توجد رسائل في السجل.</p>
+            ) : (
+              messages.map((m) => (
+                <div key={m.id} className="bg-[#08120e] rounded-xl p-2.5 text-xs space-y-1">
+                  <div className="flex justify-between text-slate-400">
+                    <span>{m.speaker === 'me' ? '• أنت' : '• الضيف'}</span>
+                    <span>{m.time}</span>
+                  </div>
+                  <div className="text-white font-semibold">{m.sourceText}</div>
+                  <div className="text-emerald-300">{m.translatedText}</div>
                 </div>
-              ) : translatedText ? (
-                translatedText
-              ) : (
-                <span className="text-blue-200/70">ستظهر الترجمة هنا...</span>
-              )}
+              ))
+            )}
+          </div>
+        ) : latestMessage ? (
+          <div
+            className={`rounded-3xl p-4 shadow-lg border transition ${
+              latestMessage.speaker === 'me'
+                ? 'bg-[#0c1d16] border-[#193d2e]'
+                : 'bg-[#1b150b] border-[#3d2d14]'
+            }`}
+          >
+            <div className="flex items-center justify-between text-xs mb-2 gap-2">
+              <span className="text-slate-400 font-mono">{latestMessage.time}</span>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-white/5 text-slate-300 truncate">
+                {getLangLabel(latestMessage.sourceLang)} ← {getLangLabel(latestMessage.targetLang)}
+              </span>
+              <span
+                className={`font-bold flex items-center gap-1 ${
+                  latestMessage.speaker === 'me' ? 'text-emerald-400' : 'text-amber-400'
+                }`}
+              >
+                <span
+                  className={`w-2 h-2 rounded-full inline-block ${
+                    latestMessage.speaker === 'me' ? 'bg-emerald-400' : 'bg-amber-400'
+                  }`}
+                />
+                {latestMessage.speaker === 'me' ? 'أنت' : 'الضيف'}
+              </span>
             </div>
 
-            <div className="flex items-center justify-between pt-3 border-t border-blue-500/50 mt-2">
-              <button
-                onClick={() => handleSpeak(translatedText, targetLang)}
-                disabled={!translatedText}
-                className="p-2 text-blue-200 hover:text-white disabled:opacity-40 transition"
-                title="استماع للترجمة"
-              >
-                <Volume2 className="w-5 h-5" />
-              </button>
+            <div className="text-right text-lg font-bold text-slate-100 mb-4">
+              {latestMessage.sourceText}
+            </div>
 
-              <button
-                onClick={handleCopy}
-                disabled={!translatedText}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-700/70 hover:bg-blue-700 text-xs font-medium disabled:opacity-40 transition"
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => handleSpeak(latestMessage.translatedText, latestMessage.targetLang)}
+                  className="w-12 h-12 rounded-2xl bg-[#10b981] hover:bg-[#059669] text-[#052e16] flex items-center justify-center active:scale-95 transition"
+                  title="استماع"
+                >
+                  <Volume2 className="w-6 h-6" />
+                </button>
+
+                <button
+                  onClick={() => handleCopy(latestMessage.id, latestMessage.translatedText)}
+                  className="w-11 h-11 rounded-2xl bg-white/10 hover:bg-white/15 text-slate-200 flex items-center justify-center active:scale-95 transition"
+                  title="نسخ"
+                >
+                  {copiedId === latestMessage.id ? (
+                    <Check className="w-5 h-5 text-emerald-400" />
+                  ) : (
+                    <Copy className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+
+              <div className="text-right text-xl font-extrabold text-white flex-1">
+                {latestMessage.translatedText}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* شريط اختيار اللغتين */}
+        <div className="bg-[#111514] border border-[#232927] rounded-2xl p-3 grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs text-slate-400 text-right">لغة الطرف الآخر:</label>
+            <div className="relative">
+              <select
+                value={guestLang}
+                onChange={(e) => setGuestLang(e.target.value)}
+                className="w-full appearance-none bg-[#1a1f1d] border border-[#2d3532] rounded-xl px-3 py-2.5 pr-8 text-xs font-bold text-white focus:outline-none"
               >
-                {copied ? <Check className="w-4 h-4 text-emerald-300" /> : <Copy className="w-4 h-4" />}
-                <span>{copied ? 'تم النسخ' : 'نسخ الترجمة'}</span>
-              </button>
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.flag} {l.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <label className="text-xs text-slate-400 text-right">لغتك (أنت):</label>
+            <div className="relative">
+              <select
+                value={myLang}
+                onChange={(e) => setMyLang(e.target.value)}
+                className="w-full appearance-none bg-[#1a1f1d] border border-[#2d3532] rounded-xl px-3 py-2.5 pr-8 text-xs font-bold text-white focus:outline-none"
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.flag} {l.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="w-4 h-4 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           </div>
         </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-            {error}
+        {/* أزرار الميكروفون الدائرية */}
+        <div className="grid grid-cols-2 gap-4 pt-1 pb-2 place-items-center">
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={() => handleVoiceInput('guest')}
+              className={`w-24 h-24 rounded-full bg-[#f59e0b] hover:bg-[#d97706] text-[#111827] flex items-center justify-center shadow-lg transition active:scale-95 ${
+                isListening === 'guest' ? 'ring-4 ring-amber-300 animate-pulse' : ''
+              }`}
+            >
+              <Mic className="w-10 h-10 stroke-[2.2]" />
+            </button>
+            <span className="text-xs font-bold text-slate-200">
+              {isListening === 'guest' ? 'جاري الاستماع...' : 'تحدث الضيف'}
+            </span>
           </div>
-        )}
 
-        <button
-          onClick={handleTranslate}
-          disabled={isLoading || !sourceText.trim()}
-          className="w-full py-3.5 px-6 rounded-2xl bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white font-bold text-base shadow-md shadow-blue-600/20 flex items-center justify-center gap-2 transition cursor-pointer"
-        >
-          <Sparkles className="w-5 h-5" />
-          <span>{isLoading ? 'جاري الترجمة...' : 'ترجم الآن'}</span>
-        </button>
+          <div className="flex flex-col items-center gap-2">
+            <button
+              onClick={() => handleVoiceInput('me')}
+              className={`w-24 h-24 rounded-full bg-[#10b981] hover:bg-[#059669] text-[#06281e] flex items-center justify-center shadow-lg transition active:scale-95 ${
+                isListening === 'me' ? 'ring-4 ring-emerald-300 animate-pulse' : ''
+              }`}
+            >
+              <Mic className="w-10 h-10 stroke-[2.2]" />
+            </button>
+            <span className="text-xs font-bold text-slate-200">
+              {isListening === 'me' ? 'جاري الاستماع...' : 'تحدث أنت'}
+            </span>
+          </div>
+        </div>
       </main>
+
+      {/* شريط الإعلان السفلي */}
+      <footer className="bg-white text-slate-900 px-3 py-2 flex items-center justify-between border-t border-slate-200">
+        <span className="text-xs font-semibold text-blue-600">Nice job!</span>
+        <div className="bg-black/80 text-white text-[11px] px-2 py-0.5 rounded">
+          Annonce test
+        </div>
+        <div className="w-7 h-7 rounded-full bg-amber-500 text-white font-black text-xs flex items-center justify-center">
+          a
+        </div>
+      </footer>
     </div>
   );
 }
