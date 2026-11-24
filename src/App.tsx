@@ -4,44 +4,44 @@ import { Camera, History, Eraser, Volume2, Mic, ChevronDown, Copy, Check } from 
 const API_BASE_URL = 'https://app-ash.vercel.app';
 
 const LANGUAGES = [
-  { code: 'ar-MA', name: 'الدارجة المغربية', flag: '🇲🇦', speech: 'ar-MA' },
-  { code: 'ar', name: 'العربية الفصحى', flag: '🇸🇦', speech: 'ar-SA' },
-  { code: 'tr', name: 'التركية', flag: '🇹🇷', speech: 'tr-TR' },
-  { code: 'fr', name: 'الفرنسية', flag: '🇫🇷', speech: 'fr-FR' },
-  { code: 'en', name: 'الإنجليزية', flag: '🇬🇧', speech: 'en-US' },
-  { code: 'es', name: 'الإسبانية', flag: '🇪🇸', speech: 'es-ES' },
-  { code: 'de', name: 'الألمانية', flag: '🇩🇪', speech: 'de-DE' },
-  { code: 'it', name: 'الإيطالية', flag: '🇮🇹', speech: 'it-IT' },
-  { code: 'pt', name: 'البرتغالية', flag: '🇵🇹', speech: 'pt-PT' },
-  { code: 'ru', name: 'الروسية', flag: '🇷🇺', speech: 'ru-RU' },
-  { code: 'zh-CN', name: 'الصينية المبسطة', flag: '🇨🇳', speech: 'zh-CN' },
-  { code: 'ja', name: 'اليابانية', flag: '🇯🇵', speech: 'ja-JP' },
-  { code: 'ko', name: 'الكورية', flag: '🇰🇷', speech: 'ko-KR' },
-  { code: 'nl', name: 'الهولندية', flag: '🇳🇱', speech: 'nl-NL' },
-  { code: 'sv', name: 'السويدية', flag: '🇸🇪', speech: 'sv-SE' },
-  { code: 'nb', name: 'النرويجية', flag: '🇳🇴', speech: 'nb-NO' },
-  { code: 'da', name: 'الدنماركية', flag: '🇩🇰', speech: 'da-DK' },
-  { code: 'fi', name: 'الفنلندية', flag: '🇫🇮', speech: 'fi-FI' },
-  { code: 'pl', name: 'البولندية', flag: '🇵🇱', speech: 'pl-PL' },
-  { code: 'el', name: 'اليونانية', flag: '🇬🇷', speech: 'el-GR' },
-  { code: 'ro', name: 'الرومانية', flag: '🇷🇴', speech: 'ro-RO' },
-  { code: 'hu', name: 'المجرية', flag: '🇭🇺', speech: 'hu-HU' },
-  { code: 'cs', name: 'التشيكية', flag: '🇨🇿', speech: 'cs-CZ' },
-  { code: 'uk', name: 'الأوكرانية', flag: '🇺🇦', speech: 'uk-UA' },
-  { code: 'hi', name: 'الهندية', flag: '🇮🇳', speech: 'hi-IN' },
-  { code: 'ur', name: 'الأردية', flag: '🇵🇰', speech: 'ur-PK' },
-  { code: 'id', name: 'الإندونيسية', flag: '🇮🇩', speech: 'id-ID' },
-  { code: 'ms', name: 'الملايوية', flag: '🇲🇾', speech: 'ms-MY' },
-  { code: 'th', name: 'التايلاندية', flag: '🇹🇭', speech: 'th-TH' },
-  { code: 'vi', name: 'الفيتنامية', flag: '🇻🇳', speech: 'vi-VN' },
-  { code: 'ar-EG', name: 'المصرية', flag: '🇪🇬', speech: 'ar-EG' },
-  { code: 'ar-AE', name: 'الخليجية', flag: '🇦🇪', speech: 'ar-AE' },
-  { code: 'ar-LB', name: 'اللبنانية', flag: '🇱🇧', speech: 'ar-LB' },
-  { code: 'ar-JO', name: 'الأردنية', flag: '🇯🇴', speech: 'ar-JO' },
-  { code: 'he', name: 'العبرية', flag: '🇮🇱', speech: 'he-IL' },
-  { code: 'fa', name: 'الفارسية', flag: '🇮🇷', speech: 'fa-IR' },
-  { code: 'sw', name: 'السواحيلية', flag: '🇹🇿', speech: 'sw-KE' },
-  { code: 'am', name: 'الأمهرية', flag: '🇪🇹', speech: 'am-ET' },
+  { code: 'ar-MA', name: 'الدارجة المغربية', flag: '🇲🇦', speech: 'ar-MA', mm: 'ar-MA' },
+  { code: 'ar', name: 'العربية الفصحى', flag: '🇸🇦', speech: 'ar-SA', mm: 'ar-SA' },
+  { code: 'tr', name: 'التركية', flag: '🇹🇷', speech: 'tr-TR', mm: 'tr-TR' },
+  { code: 'fr', name: 'الفرنسية', flag: '🇫🇷', speech: 'fr-FR', mm: 'fr-FR' },
+  { code: 'en', name: 'الإنجليزية', flag: '🇬🇧', speech: 'en-US', mm: 'en-GB' },
+  { code: 'es', name: 'الإسبانية', flag: '🇪🇸', speech: 'es-ES', mm: 'es-ES' },
+  { code: 'de', name: 'الألمانية', flag: '🇩🇪', speech: 'de-DE', mm: 'de-DE' },
+  { code: 'it', name: 'الإيطالية', flag: '🇮🇹', speech: 'it-IT', mm: 'it-IT' },
+  { code: 'pt', name: 'البرتغالية', flag: '🇵🇹', speech: 'pt-PT', mm: 'pt-PT' },
+  { code: 'ru', name: 'الروسية', flag: '🇷🇺', speech: 'ru-RU', mm: 'ru-RU' },
+  { code: 'zh-CN', name: 'الصينية المبسطة', flag: '🇨🇳', speech: 'zh-CN', mm: 'zh-CN' },
+  { code: 'ja', name: 'اليابانية', flag: '🇯🇵', speech: 'ja-JP', mm: 'ja-JP' },
+  { code: 'ko', name: 'الكورية', flag: '🇰🇷', speech: 'ko-KR', mm: 'ko-KR' },
+  { code: 'nl', name: 'الهولندية', flag: '🇳🇱', speech: 'nl-NL', mm: 'nl-NL' },
+  { code: 'sv', name: 'السويدية', flag: '🇸🇪', speech: 'sv-SE', mm: 'sv-SE' },
+  { code: 'nb', name: 'النرويجية', flag: '🇳🇴', speech: 'nb-NO', mm: 'nb-NO' },
+  { code: 'da', name: 'الدنماركية', flag: '🇩🇰', speech: 'da-DK', mm: 'da-DK' },
+  { code: 'fi', name: 'الفنلندية', flag: '🇫🇮', speech: 'fi-FI', mm: 'fi-FI' },
+  { code: 'pl', name: 'البولندية', flag: '🇵🇱', speech: 'pl-PL', mm: 'pl-PL' },
+  { code: 'el', name: 'اليونانية', flag: '🇬🇷', speech: 'el-GR', mm: 'el-GR' },
+  { code: 'ro', name: 'الرومانية', flag: '🇷🇴', speech: 'ro-RO', mm: 'ro-RO' },
+  { code: 'hu', name: 'المجرية', flag: '🇭🇺', speech: 'hu-HU', mm: 'hu-HU' },
+  { code: 'cs', name: 'التشيكية', flag: '🇨🇿', speech: 'cs-CZ', mm: 'cs-CZ' },
+  { code: 'uk', name: 'الأوكرانية', flag: '🇺🇦', speech: 'uk-UA', mm: 'uk-UA' },
+  { code: 'hi', name: 'الهندية', flag: '🇮🇳', speech: 'hi-IN', mm: 'hi-IN' },
+  { code: 'ur', name: 'الأردية', flag: '🇵🇰', speech: 'ur-PK', mm: 'ur-PK' },
+  { code: 'id', name: 'الإندونيسية', flag: '🇮🇩', speech: 'id-ID', mm: 'id-ID' },
+  { code: 'ms', name: 'الملايوية', flag: '🇲🇾', speech: 'ms-MY', mm: 'ms-MY' },
+  { code: 'th', name: 'التايلاندية', flag: '🇹🇭', speech: 'th-TH', mm: 'th-TH' },
+  { code: 'vi', name: 'الفيتنامية', flag: '🇻🇳', speech: 'vi-VN', mm: 'vi-VN' },
+  { code: 'ar-EG', name: 'المصرية', flag: '🇪🇬', speech: 'ar-EG', mm: 'ar-EG' },
+  { code: 'ar-AE', name: 'الخليجية', flag: '🇦🇪', speech: 'ar-AE', mm: 'ar-AE' },
+  { code: 'ar-LB', name: 'اللبنانية', flag: '🇱🇧', speech: 'ar-LB', mm: 'ar-LB' },
+  { code: 'ar-JO', name: 'الأردنية', flag: '🇯🇴', speech: 'ar-JO', mm: 'ar-JO' },
+  { code: 'he', name: 'العبرية', flag: '🇮🇱', speech: 'he-IL', mm: 'he-IL' },
+  { code: 'fa', name: 'الفارسية', flag: '🇮🇷', speech: 'fa-IR', mm: 'fa-IR' },
+  { code: 'sw', name: 'السواحيلية', flag: '🇹🇿', speech: 'sw-KE', mm: 'sw-KE' },
+  { code: 'am', name: 'الأمهرية', flag: '🇪🇹', speech: 'am-ET', mm: 'am-ET' },
 ];
 
 interface MessageItem {
@@ -56,21 +56,22 @@ interface MessageItem {
 
 export default function App() {
   const [myLang, setMyLang] = useState('ar-MA');
-  const [guestLang, setGuestLang] = useState('tr');
+  const [guestLang, setGuestLang] = useState('de');
   const [messages, setMessages] = useState<MessageItem[]>([
     {
       id: 1,
-      time: '04:16',
+      time: '06:48',
       speaker: 'me',
       sourceText: 'اهلا وسهلا',
-      translatedText: 'تعذر الاتصال بالخادم.',
+      translatedText: 'Willkommen',
       sourceLang: 'ar-MA',
-      targetLang: 'tr',
+      targetLang: 'de',
     },
   ]);
   const [isListening, setIsListening] = useState<'me' | 'guest' | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [statusNote, setStatusNote] = useState<string>('');
 
   const getNowTime = () => {
     const now = new Date();
@@ -83,12 +84,24 @@ export default function App() {
   };
 
   const handleSpeak = (text: string, langCode: string) => {
-    if (!text || !('speechSynthesis' in window)) return;
-    const langObj = LANGUAGES.find((l) => l.code === langCode);
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = langObj?.speech || langCode;
-    window.speechSynthesis.speak(utterance);
+    if (!text) return;
+    if (!('speechSynthesis' in window)) {
+      setStatusNote('النطق الصوتي غير مدعوم في هذا الجهاز.');
+      return;
+    }
+    try {
+      const langObj = LANGUAGES.find((l) => l.code === langCode);
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = langObj?.speech || langCode;
+      utterance.onerror = () => {
+        setStatusNote('تأكد من توفر حزمة الصوت للغة المختارة في إعدادات الهاتف.');
+      };
+      window.speechSynthesis.speak(utterance);
+      setStatusNote('');
+    } catch {
+      setStatusNote('تعذر تشغيل النطق الصوتي.');
+    }
   };
 
   const handleCopy = (id: number, text: string) => {
@@ -102,6 +115,8 @@ export default function App() {
     const time = getNowTime();
     const speaker: 'me' | 'guest' = fromCode === myLang ? 'me' : 'guest';
     const newId = Date.now();
+    setShowHistory(false);
+    setStatusNote('');
 
     setMessages((prev) => [
       ...prev,
@@ -127,24 +142,50 @@ export default function App() {
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data?.error?.message || 'تعذر الاتصال بالخادم.');
+      if (res.ok) {
+        const data = await res.json();
+        const out =
+          data.translatedText ||
+          data.result ||
+          data.choices?.[0]?.message?.content;
+        if (out && String(out).trim()) {
+          setMessages((prev) =>
+            prev.map((m) => (m.id === newId ? { ...m, translatedText: String(out).trim() } : m))
+          );
+          return;
+        }
       }
-
-      const out =
-        data.translatedText ||
-        data.result ||
-        data.choices?.[0]?.message?.content ||
-        'تعذر الاتصال بالخادم.';
-
-      setMessages((prev) =>
-        prev.map((m) => (m.id === newId ? { ...m, translatedText: String(out).trim() } : m))
-      );
+      throw new Error('Primary API failed');
     } catch {
-      setMessages((prev) =>
-        prev.map((m) => (m.id === newId ? { ...m, translatedText: 'تعذر الاتصال بالخادم.' } : m))
-      );
+      try {
+        const fromObj = LANGUAGES.find((l) => l.code === fromCode);
+        const toObj = LANGUAGES.find((l) => l.code === toCode);
+        const src = (fromObj?.mm || 'ar').split('-')[0];
+        const tgt = (toObj?.mm || 'en').split('-')[0];
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(
+          text
+        )}&langpair=${encodeURIComponent(`${src}|${tgt}`)}`;
+        const fallbackRes = await fetch(url);
+        const fallbackData = await fallbackRes.json();
+        const fallbackOut = fallbackData?.responseData?.translatedText;
+
+        if (fallbackOut && String(fallbackOut).trim()) {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === newId ? { ...m, translatedText: String(fallbackOut).trim() } : m
+            )
+          );
+          return;
+        }
+        throw new Error('Fallback API failed');
+      } catch {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === newId ? { ...m, translatedText: 'تعذر الاتصال بالخادم.' } : m
+          )
+        );
+        setStatusNote('تحقق من الاتصال بالإنترنت أو من إعدادات الخادم.');
+      }
     }
   };
 
@@ -169,6 +210,7 @@ export default function App() {
     recognition.interimResults = false;
 
     setIsListening(speaker);
+    setStatusNote('');
 
     recognition.onresult = (event: any) => {
       const transcript = event.results?.[0]?.[0]?.transcript || '';
@@ -179,6 +221,7 @@ export default function App() {
 
     recognition.onerror = () => {
       setIsListening(null);
+      setStatusNote('تعذر التقاط الصوت؛ تأكد من إذن الميكروفون أو جرب الكتابة.');
     };
 
     recognition.onend = () => {
@@ -203,7 +246,10 @@ export default function App() {
     input.accept = 'image/*';
     input.capture = 'environment';
     input.onchange = () => {
-      translateText('مرحبا', myLang, guestLang);
+      const sample = prompt('أدخل النص الظاهر في الصورة لترجمته:');
+      if (sample && sample.trim()) {
+        translateText(sample.trim(), myLang, guestLang);
+      }
     };
     input.click();
   };
@@ -263,6 +309,12 @@ export default function App() {
 
       {/* منطقة العرض الرئيسية */}
       <main className="flex-1 px-3 py-2 flex flex-col justify-center gap-4">
+        {statusNote ? (
+          <div className="bg-amber-950/60 border border-amber-500/40 text-amber-200 text-xs rounded-xl px-3 py-2 text-right">
+            {statusNote}
+          </div>
+        ) : null}
+
         {showHistory ? (
           <div className="bg-[#0e1b16] border border-[#1d382e] rounded-2xl p-3 max-h-64 overflow-y-auto space-y-2">
             <div className="flex items-center justify-between text-xs text-emerald-300 pb-1 border-b border-[#1d382e]">
@@ -281,7 +333,16 @@ export default function App() {
                     <span>{m.time}</span>
                   </div>
                   <div className="text-white font-semibold">{m.sourceText}</div>
-                  <div className="text-emerald-300">{m.translatedText}</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      onClick={() => handleSpeak(m.translatedText, m.targetLang)}
+                      className="px-2 py-1 rounded-lg bg-emerald-600/30 text-emerald-300 flex items-center gap-1"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                      <span>صوت</span>
+                    </button>
+                    <span className="text-emerald-300 text-right flex-1">{m.translatedText}</span>
+                  </div>
                 </div>
               ))
             )}
