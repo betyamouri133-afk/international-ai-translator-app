@@ -1,47 +1,47 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Camera, History, Eraser, Volume2, Mic, ChevronDown, Copy, Check } from 'lucide-react';
 
 const API_BASE_URL = 'https://app-ash.vercel.app';
 
 const LANGUAGES = [
-  { code: 'ar-MA', name: 'الدارجة المغربية', flag: '🇲🇦', speech: 'ar-MA', mm: 'ar-MA' },
-  { code: 'ar', name: 'العربية الفصحى', flag: '🇸🇦', speech: 'ar-SA', mm: 'ar-SA' },
-  { code: 'tr', name: 'التركية', flag: '🇹🇷', speech: 'tr-TR', mm: 'tr-TR' },
-  { code: 'fr', name: 'الفرنسية', flag: '🇫🇷', speech: 'fr-FR', mm: 'fr-FR' },
-  { code: 'en', name: 'الإنجليزية', flag: '🇬🇧', speech: 'en-US', mm: 'en-GB' },
-  { code: 'es', name: 'الإسبانية', flag: '🇪🇸', speech: 'es-ES', mm: 'es-ES' },
-  { code: 'de', name: 'الألمانية', flag: '🇩🇪', speech: 'de-DE', mm: 'de-DE' },
-  { code: 'it', name: 'الإيطالية', flag: '🇮🇹', speech: 'it-IT', mm: 'it-IT' },
-  { code: 'pt', name: 'البرتغالية', flag: '🇵🇹', speech: 'pt-PT', mm: 'pt-PT' },
-  { code: 'ru', name: 'الروسية', flag: '🇷🇺', speech: 'ru-RU', mm: 'ru-RU' },
-  { code: 'zh-CN', name: 'الصينية المبسطة', flag: '🇨🇳', speech: 'zh-CN', mm: 'zh-CN' },
-  { code: 'ja', name: 'اليابانية', flag: '🇯🇵', speech: 'ja-JP', mm: 'ja-JP' },
-  { code: 'ko', name: 'الكورية', flag: '🇰🇷', speech: 'ko-KR', mm: 'ko-KR' },
-  { code: 'nl', name: 'الهولندية', flag: '🇳🇱', speech: 'nl-NL', mm: 'nl-NL' },
-  { code: 'sv', name: 'السويدية', flag: '🇸🇪', speech: 'sv-SE', mm: 'sv-SE' },
-  { code: 'nb', name: 'النرويجية', flag: '🇳🇴', speech: 'nb-NO', mm: 'nb-NO' },
-  { code: 'da', name: 'الدنماركية', flag: '🇩🇰', speech: 'da-DK', mm: 'da-DK' },
-  { code: 'fi', name: 'الفنلندية', flag: '🇫🇮', speech: 'fi-FI', mm: 'fi-FI' },
-  { code: 'pl', name: 'البولندية', flag: '🇵🇱', speech: 'pl-PL', mm: 'pl-PL' },
-  { code: 'el', name: 'اليونانية', flag: '🇬🇷', speech: 'el-GR', mm: 'el-GR' },
-  { code: 'ro', name: 'الرومانية', flag: '🇷🇴', speech: 'ro-RO', mm: 'ro-RO' },
-  { code: 'hu', name: 'المجرية', flag: '🇭🇺', speech: 'hu-HU', mm: 'hu-HU' },
-  { code: 'cs', name: 'التشيكية', flag: '🇨🇿', speech: 'cs-CZ', mm: 'cs-CZ' },
-  { code: 'uk', name: 'الأوكرانية', flag: '🇺🇦', speech: 'uk-UA', mm: 'uk-UA' },
-  { code: 'hi', name: 'الهندية', flag: '🇮🇳', speech: 'hi-IN', mm: 'hi-IN' },
-  { code: 'ur', name: 'الأردية', flag: '🇵🇰', speech: 'ur-PK', mm: 'ur-PK' },
-  { code: 'id', name: 'الإندونيسية', flag: '🇮🇩', speech: 'id-ID', mm: 'id-ID' },
-  { code: 'ms', name: 'الملايوية', flag: '🇲🇾', speech: 'ms-MY', mm: 'ms-MY' },
-  { code: 'th', name: 'التايلاندية', flag: '🇹🇭', speech: 'th-TH', mm: 'th-TH' },
-  { code: 'vi', name: 'الفيتنامية', flag: '🇻🇳', speech: 'vi-VN', mm: 'vi-VN' },
-  { code: 'ar-EG', name: 'المصرية', flag: '🇪🇬', speech: 'ar-EG', mm: 'ar-EG' },
-  { code: 'ar-AE', name: 'الخليجية', flag: '🇦🇪', speech: 'ar-AE', mm: 'ar-AE' },
-  { code: 'ar-LB', name: 'اللبنانية', flag: '🇱🇧', speech: 'ar-LB', mm: 'ar-LB' },
-  { code: 'ar-JO', name: 'الأردنية', flag: '🇯🇴', speech: 'ar-JO', mm: 'ar-JO' },
-  { code: 'he', name: 'العبرية', flag: '🇮🇱', speech: 'he-IL', mm: 'he-IL' },
-  { code: 'fa', name: 'الفارسية', flag: '🇮🇷', speech: 'fa-IR', mm: 'fa-IR' },
-  { code: 'sw', name: 'السواحيلية', flag: '🇹🇿', speech: 'sw-KE', mm: 'sw-KE' },
-  { code: 'am', name: 'الأمهرية', flag: '🇪🇹', speech: 'am-ET', mm: 'am-ET' },
+  { code: 'ar-MA', name: 'الدارجة المغربية', flag: '🇲🇦', speech: 'ar-MA', mm: 'ar-MA', tts: 'ar' },
+  { code: 'ar', name: 'العربية الفصحى', flag: '🇸🇦', speech: 'ar-SA', mm: 'ar-SA', tts: 'ar' },
+  { code: 'tr', name: 'التركية', flag: '🇹🇷', speech: 'tr-TR', mm: 'tr-TR', tts: 'tr' },
+  { code: 'fr', name: 'الفرنسية', flag: '🇫🇷', speech: 'fr-FR', mm: 'fr-FR', tts: 'fr' },
+  { code: 'en', name: 'الإنجليزية', flag: '🇬🇧', speech: 'en-US', mm: 'en-GB', tts: 'en' },
+  { code: 'es', name: 'الإسبانية', flag: '🇪🇸', speech: 'es-ES', mm: 'es-ES', tts: 'es' },
+  { code: 'de', name: 'الألمانية', flag: '🇩🇪', speech: 'de-DE', mm: 'de-DE', tts: 'de' },
+  { code: 'it', name: 'الإيطالية', flag: '🇮🇹', speech: 'it-IT', mm: 'it-IT', tts: 'it' },
+  { code: 'pt', name: 'البرتغالية', flag: '🇵🇹', speech: 'pt-PT', mm: 'pt-PT', tts: 'pt' },
+  { code: 'ru', name: 'الروسية', flag: '🇷🇺', speech: 'ru-RU', mm: 'ru-RU', tts: 'ru' },
+  { code: 'zh-CN', name: 'الصينية المبسطة', flag: '🇨🇳', speech: 'zh-CN', mm: 'zh-CN', tts: 'zh-CN' },
+  { code: 'ja', name: 'اليابانية', flag: '🇯🇵', speech: 'ja-JP', mm: 'ja-JP', tts: 'ja' },
+  { code: 'ko', name: 'الكورية', flag: '🇰🇷', speech: 'ko-KR', mm: 'ko-KR', tts: 'ko' },
+  { code: 'nl', name: 'الهولندية', flag: '🇳🇱', speech: 'nl-NL', mm: 'nl-NL', tts: 'nl' },
+  { code: 'sv', name: 'السويدية', flag: '🇸🇪', speech: 'sv-SE', mm: 'sv-SE', tts: 'sv' },
+  { code: 'nb', name: 'النرويجية', flag: '🇳🇴', speech: 'nb-NO', mm: 'nb-NO', tts: 'no' },
+  { code: 'da', name: 'الدنماركية', flag: '🇩🇰', speech: 'da-DK', mm: 'da-DK', tts: 'da' },
+  { code: 'fi', name: 'الفنلندية', flag: '🇫🇮', speech: 'fi-FI', mm: 'fi-FI', tts: 'fi' },
+  { code: 'pl', name: 'البولندية', flag: '🇵🇱', speech: 'pl-PL', mm: 'pl-PL', tts: 'pl' },
+  { code: 'el', name: 'اليونانية', flag: '🇬🇷', speech: 'el-GR', mm: 'el-GR', tts: 'el' },
+  { code: 'ro', name: 'الرومانية', flag: '🇷🇴', speech: 'ro-RO', mm: 'ro-RO', tts: 'ro' },
+  { code: 'hu', name: 'المجرية', flag: '🇭🇺', speech: 'hu-HU', mm: 'hu-HU', tts: 'hu' },
+  { code: 'cs', name: 'التشيكية', flag: '🇨🇿', speech: 'cs-CZ', mm: 'cs-CZ', tts: 'cs' },
+  { code: 'uk', name: 'الأوكرانية', flag: '🇺🇦', speech: 'uk-UA', mm: 'uk-UA', tts: 'uk' },
+  { code: 'hi', name: 'الهندية', flag: '🇮🇳', speech: 'hi-IN', mm: 'hi-IN', tts: 'hi' },
+  { code: 'ur', name: 'الأردية', flag: '🇵🇰', speech: 'ur-PK', mm: 'ur-PK', tts: 'ur' },
+  { code: 'id', name: 'الإندونيسية', flag: '🇮🇩', speech: 'id-ID', mm: 'id-ID', tts: 'id' },
+  { code: 'ms', name: 'الملايوية', flag: '🇲🇾', speech: 'ms-MY', mm: 'ms-MY', tts: 'ms' },
+  { code: 'th', name: 'التايلاندية', flag: '🇹🇭', speech: 'th-TH', mm: 'th-TH', tts: 'th' },
+  { code: 'vi', name: 'الفيتنامية', flag: '🇻🇳', speech: 'vi-VN', mm: 'vi-VN', tts: 'vi' },
+  { code: 'ar-EG', name: 'المصرية', flag: '🇪🇬', speech: 'ar-EG', mm: 'ar-EG', tts: 'ar' },
+  { code: 'ar-AE', name: 'الخليجية', flag: '🇦🇪', speech: 'ar-AE', mm: 'ar-AE', tts: 'ar' },
+  { code: 'ar-LB', name: 'اللبنانية', flag: '🇱🇧', speech: 'ar-LB', mm: 'ar-LB', tts: 'ar' },
+  { code: 'ar-JO', name: 'الأردنية', flag: '🇯🇴', speech: 'ar-JO', mm: 'ar-JO', tts: 'ar' },
+  { code: 'he', name: 'العبرية', flag: '🇮🇱', speech: 'he-IL', mm: 'he-IL', tts: 'iw' },
+  { code: 'fa', name: 'الفارسية', flag: '🇮🇷', speech: 'fa-IR', mm: 'fa-IR', tts: 'fa' },
+  { code: 'sw', name: 'السواحيلية', flag: '🇹🇿', speech: 'sw-KE', mm: 'sw-KE', tts: 'sw' },
+  { code: 'am', name: 'الأمهرية', flag: '🇪🇹', speech: 'am-ET', mm: 'am-ET', tts: 'am' },
 ];
 
 interface MessageItem {
@@ -60,10 +60,10 @@ export default function App() {
   const [messages, setMessages] = useState<MessageItem[]>([
     {
       id: 1,
-      time: '06:48',
+      time: '13:21',
       speaker: 'me',
-      sourceText: 'اهلا وسهلا',
-      translatedText: 'Willkommen',
+      sourceText: 'السلام عليكم',
+      translatedText: 'Friede sei mit euch!',
       sourceLang: 'ar-MA',
       targetLang: 'de',
     },
@@ -72,6 +72,8 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const [statusNote, setStatusNote] = useState<string>('');
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   const getNowTime = () => {
     const now = new Date();
@@ -83,25 +85,62 @@ export default function App() {
     return found ? `${found.flag} ${found.name}` : code;
   };
 
+  const playFallbackAudio = (text: string, langCode: string) => {
+    const langObj = LANGUAGES.find((l) => l.code === langCode);
+    const tl = langObj?.tts || 'en';
+    const url = `https://translate.google.com/translate_tts?ie=UTF-8&client=tw-ob&tl=${encodeURIComponent(
+      tl
+    )}&q=${encodeURIComponent(text)}`;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+    }
+    const audio = new Audio(url);
+    audioRef.current = audio;
+
+    audio.play().catch(() => {
+      setStatusNote('تعذر تشغيل الصوت؛ تأكد من الاتصال بالإنترنت أو من صوت الجهاز.');
+    });
+  };
+
   const handleSpeak = (text: string, langCode: string) => {
     if (!text) return;
-    if (!('speechSynthesis' in window)) {
-      setStatusNote('النطق الصوتي غير مدعوم في هذا الجهاز.');
-      return;
+    setStatusNote('');
+
+    const langObj = LANGUAGES.find((l) => l.code === langCode);
+    const speechLang = langObj?.speech || langCode;
+
+    if ('speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined') {
+      try {
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = speechLang;
+
+        let started = false;
+        utterance.onstart = () => {
+          started = true;
+        };
+        utterance.onerror = () => {
+          if (!started) {
+            playFallbackAudio(text, langCode);
+          }
+        };
+
+        window.speechSynthesis.speak(utterance);
+
+        setTimeout(() => {
+          if (!started && !window.speechSynthesis.speaking) {
+            playFallbackAudio(text, langCode);
+          }
+        }, 450);
+        return;
+      } catch {
+        playFallbackAudio(text, langCode);
+        return;
+      }
     }
-    try {
-      const langObj = LANGUAGES.find((l) => l.code === langCode);
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = langObj?.speech || langCode;
-      utterance.onerror = () => {
-        setStatusNote('تأكد من توفر حزمة الصوت للغة المختارة في إعدادات الهاتف.');
-      };
-      window.speechSynthesis.speak(utterance);
-      setStatusNote('');
-    } catch {
-      setStatusNote('تعذر تشغيل النطق الصوتي.');
-    }
+
+    playFallbackAudio(text, langCode);
   };
 
   const handleCopy = (id: number, text: string) => {
@@ -241,23 +280,42 @@ export default function App() {
   };
 
   const handleCameraClick = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.capture = 'environment';
-    input.onchange = () => {
-      const sample = prompt('أدخل النص الظاهر في الصورة لترجمته:');
+    setStatusNote('');
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = '';
+      cameraInputRef.current.click();
+    } else {
+      const sample = prompt('أدخل النص المراد ترجمته:');
       if (sample && sample.trim()) {
         translateText(sample.trim(), myLang, guestLang);
       }
-    };
-    input.click();
+    }
+  };
+
+  const handleCameraFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const textFromUser = prompt('تم اختيار الصورة. اكتب أو الصق النص الموجود فيها لترجمته:');
+    if (textFromUser && textFromUser.trim()) {
+      translateText(textFromUser.trim(), myLang, guestLang);
+    } else {
+      setStatusNote('تم اختيار الصورة بنجاح؛ أدخل النص لترجمته.');
+    }
   };
 
   const latestMessage = messages[messages.length - 1];
 
   return (
     <div className="min-h-screen bg-[#070b0a] text-white flex flex-col justify-between select-none">
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        onChange={handleCameraFileChange}
+        className="hidden"
+      />
+
       {/* الشريط العلوي */}
       <header className="px-3 pt-3 pb-2 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
