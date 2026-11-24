@@ -1,0 +1,8 @@
+{
+  "appId": "com.betyamouri.aitranslator",
+  "appName": "المترجم الذكي الفوري",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}
