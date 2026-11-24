@@ -17,14 +17,12 @@ interface ConversationSession {
 }
 
 const ALL_LANGUAGES = [
-  // اللهجات العربية والعربية الفصحى
   { code: 'ar-MA', label: '🇲🇦 الدارجة المغربية', promptName: 'Moroccan Darija (Arabic script only)' },
   { code: 'ar-SA', label: '🇸🇦 اللهجة الخليجية', promptName: 'Gulf Arabic dialect (Khaleeji, Arabic script only)' },
   { code: 'ar-EG', label: '🇪🇬 اللهجة المصرية', promptName: 'Egyptian Arabic dialect (Masri, Arabic script only)' },
   { code: 'ar-LB', label: '🇱🇧 اللهجة الشامية', promptName: 'Levantine Arabic dialect (Arabic script only)' },
   { code: 'ar-001', label: '🌍 العربية الفصحى', promptName: 'Modern Standard Arabic' },
 
-  // اللغات الآسيوية المطلوبة والأكثر انتشاراً
   { code: 'ja-JP', label: '🇯🇵 اليابانية (日本語)', promptName: 'Japanese' },
   { code: 'ko-KR', label: '🇰🇷 الكورية (한국어)', promptName: 'Korean' },
   { code: 'hi-IN', label: '🇮🇳 الهندية (हिन्दी)', promptName: 'Hindi' },
@@ -38,7 +36,6 @@ const ALL_LANGUAGES = [
   { code: 'fil-PH', label: '🇵🇭 الفلبينية (Tagalog)', promptName: 'Filipino Tagalog' },
   { code: 'bn-BD', label: '🇧🇩 البنغالية (বাংলা)', promptName: 'Bengali' },
 
-  // اللغات الأوروبية والعالمية
   { code: 'en-US', label: '🇺🇸 الإنجليزية (English)', promptName: 'English' },
   { code: 'fr-FR', label: '🇫🇷 الفرنسية (Français)', promptName: 'French' },
   { code: 'es-ES', label: '🇪🇸 الإسبانية (Español)', promptName: 'Spanish' },
@@ -55,10 +52,13 @@ const ALL_LANGUAGES = [
   { code: 'ro-RO', label: '🇷🇴 الرومانية (Română)', promptName: 'Romanian' },
   { code: 'fa-IR', label: '🇮🇷 الفارسية (فارسی)', promptName: 'Persian' },
 
-  // اللغات الإفريقية
   { code: 'sw-KE', label: '🇰🇪 السواحيلية (Kiswahili)', promptName: 'Swahili' },
   { code: 'ha-NG', label: '🇳🇬 الهوسا (Hausa)', promptName: 'Hausa' },
 ];
+
+// ملف صوتي صامت لفك قفل الصوت في متصفح الموبايل عند الضغط على الزر
+const SILENT_AUDIO =
+  'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
 
 export default function App() {
   const [langUser, setLangUser] = useState('ar-MA');
@@ -83,10 +83,15 @@ export default function App() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const playerRef = useRef<HTMLAudioElement | null>(null);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    // إنشاء مشغل صوتي واحد وإعادة استخدامه لتجاوز قيود Autoplay في الهاتف
+    const audio = new Audio();
+    audio.preload = 'auto';
+    playerRef.current = audio;
+
     if ('speechSynthesis' in window) {
       window.speechSynthesis.getVoices();
       window.speechSynthesis.onvoiceschanged = () => {
@@ -116,6 +121,17 @@ export default function App() {
     };
   }, [messages]);
 
+  const unlockAudioInMobile = () => {
+    if (playerRef.current) {
+      playerRef.current.src = SILENT_AUDIO;
+      playerRef.current.play().catch(() => {});
+    }
+    if ('speechSynthesis' in window) {
+      const u = new SpeechSynthesisUtterance('');
+      window.speechSynthesis.speak(u);
+    }
+  };
+
   const archiveCurrentCall = () => {
     if (messages.length === 0) return;
     const newSession: ConversationSession = {
@@ -141,55 +157,44 @@ export default function App() {
     return code;
   };
 
-  const speakText = async (text: string, lang: string) => {
+  const speakText = (text: string, lang: string) => {
     if (!text || text.startsWith('⚡')) return;
 
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
 
     const ttsLang = lang.startsWith('ar') ? 'ar-SA' : lang;
+    const ttsUrl = `/api/translate?tts=1&lang=${encodeURIComponent(ttsLang)}&text=${encodeURIComponent(text.slice(0, 200))}`;
 
-    try {
-      const res = await fetch('/api/translate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'tts',
-          text,
-          lang: ttsLang,
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.audioBase64) {
-          const audio = new Audio(data.audioBase64);
-          audioRef.current = audio;
-          await audio.play();
-          return;
-        }
+    const player = playerRef.current || new Audio();
+    playerRef.current = player;
+    player.pause();
+    player.src = ttsUrl;
+
+    player.onerror = () => {
+      // في حال تعذر السيرفر، نستعمل نطق الهاتف المحلي
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = ttsLang;
+        utterance.rate = 0.95;
+        window.speechSynthesis.speak(utterance);
       }
-    } catch {
-      // احتياطي: النطق المحلي من الهاتف
-    }
+    };
 
-    if ('speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = ttsLang;
-      utterance.rate = 0.95;
-      window.speechSynthesis.speak(utterance);
-    }
+    player.play().catch(() => {
+      if ('speechSynthesis' in window) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = ttsLang;
+        utterance.rate = 0.95;
+        window.speechSynthesis.speak(utterance);
+      }
+    });
   };
 
   const startSpeechRecognition = (sender: 'user' | 'guest') => {
-    if ('speechSynthesis' in window) {
-      const unlock = new SpeechSynthesisUtterance('');
-      window.speechSynthesis.speak(unlock);
-    }
+    // فك قفل الصوت في متصفح الموبايل فوراً عند لمس الزر
+    unlockAudioInMobile();
 
     const SpeechRecognition =
       (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -292,6 +297,7 @@ export default function App() {
   };
 
   const openCamera = async () => {
+    unlockAudioInMobile();
     setCameraActive(true);
     setCapturedImage(null);
     setCamTranslation('');
@@ -309,6 +315,7 @@ export default function App() {
   };
 
   const captureAndTranslate = async () => {
+    unlockAudioInMobile();
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current;
       const canvas = canvasRef.current;
@@ -431,9 +438,12 @@ export default function App() {
                 <p className="text-[10px] text-slate-400 mb-1">
                   {msg.timestamp}
                 </p>
-                <p className="text-sm">{msg.text}</p>
+                <p dir="auto" className="text-sm">
+                  {msg.text}
+                </p>
                 <div className="mt-2 pt-2 border-t border-slate-800 text-sm text-white font-bold flex items-center justify-between gap-3">
                   <span
+                    dir="auto"
                     className={
                       msg.translation.startsWith('⚡')
                         ? 'text-xs text-blue-300 animate-pulse font-normal'
@@ -445,7 +455,7 @@ export default function App() {
                   {!msg.translation.startsWith('⚡') && (
                     <button
                       onClick={() => speakText(msg.translation, msg.targetLang)}
-                      className="p-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 rounded-lg text-xs shrink-0"
+                      className="p-2 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg text-xs shrink-0 shadow"
                     >
                       🔊
                     </button>
@@ -457,7 +467,10 @@ export default function App() {
         )}
 
         {liveTranscript && (
-          <div className="p-3 rounded-2xl bg-slate-800/80 border border-blue-500/40 text-sm text-blue-200 animate-pulse">
+          <div
+            dir="auto"
+            className="p-3 rounded-2xl bg-slate-800/80 border border-blue-500/40 text-sm text-blue-200 animate-pulse"
+          >
             🎙️ {liveTranscript}...
           </div>
         )}
@@ -508,14 +521,16 @@ export default function App() {
                       key={i}
                       className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 space-y-1"
                     >
-                      <p className="text-xs text-slate-400">{m.text}</p>
+                      <p dir="auto" className="text-xs text-slate-400">
+                        {m.text}
+                      </p>
                       <div className="flex justify-between items-center gap-2">
-                        <p className="text-sm font-bold text-white">
+                        <p dir="auto" className="text-sm font-bold text-white">
                           {m.translation}
                         </p>
                         <button
                           onClick={() => speakText(m.translation, m.targetLang)}
-                          className="p-1 bg-slate-800 rounded text-xs"
+                          className="p-1.5 bg-slate-800 rounded text-xs"
                         >
                           🔊
                         </button>
@@ -584,7 +599,9 @@ export default function App() {
             </p>
           ) : (
             <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center gap-2">
-              <p className="text-sm text-white font-medium">{camTranslation}</p>
+              <p dir="auto" className="text-sm text-white font-medium">
+                {camTranslation}
+              </p>
               <button
                 onClick={() => speakText(camTranslation, langUser)}
                 className="p-1.5 bg-slate-800 rounded-lg text-xs shrink-0"
