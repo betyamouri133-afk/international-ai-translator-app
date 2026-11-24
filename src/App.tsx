@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 interface Message {
+  id: string;
   sender: 'user' | 'guest';
   text: string;
   translation: string;
@@ -15,10 +16,55 @@ interface ConversationSession {
   messages: Message[];
 }
 
+const ALL_LANGUAGES = [
+  // اللهجات العربية والعربية الفصحى
+  { code: 'ar-MA', label: '🇲🇦 الدارجة المغربية', promptName: 'Moroccan Darija (Arabic script only)' },
+  { code: 'ar-SA', label: '🇸🇦 اللهجة الخليجية', promptName: 'Gulf Arabic dialect (Khaleeji, Arabic script only)' },
+  { code: 'ar-EG', label: '🇪🇬 اللهجة المصرية', promptName: 'Egyptian Arabic dialect (Masri, Arabic script only)' },
+  { code: 'ar-LB', label: '🇱🇧 اللهجة الشامية', promptName: 'Levantine Arabic dialect (Arabic script only)' },
+  { code: 'ar-001', label: '🌍 العربية الفصحى', promptName: 'Modern Standard Arabic' },
+
+  // اللغات الآسيوية المطلوبة والأكثر انتشاراً
+  { code: 'ja-JP', label: '🇯🇵 اليابانية (日本語)', promptName: 'Japanese' },
+  { code: 'ko-KR', label: '🇰🇷 الكورية (한국어)', promptName: 'Korean' },
+  { code: 'hi-IN', label: '🇮🇳 الهندية (हिन्दी)', promptName: 'Hindi' },
+  { code: 'zh-CN', label: '🇨🇳 الصينية المبسطة (简体中文)', promptName: 'Simplified Mandarin Chinese' },
+  { code: 'zh-TW', label: '🇹🇼 الصينية التقليدية (繁體中文)', promptName: 'Traditional Chinese' },
+  { code: 'ur-PK', label: '🇵🇰 الأردية (اردو)', promptName: 'Urdu' },
+  { code: 'id-ID', label: '🇮🇩 الإندونيسية (Bahasa Indonesia)', promptName: 'Indonesian' },
+  { code: 'ms-MY', label: '🇲🇾 الملايوية (Bahasa Melayu)', promptName: 'Malay' },
+  { code: 'th-TH', label: '🇹🇭 التايلاندية (ไทย)', promptName: 'Thai' },
+  { code: 'vi-VN', label: '🇻🇳 الفيتنامية (Tiếng Việt)', promptName: 'Vietnamese' },
+  { code: 'fil-PH', label: '🇵🇭 الفلبينية (Tagalog)', promptName: 'Filipino Tagalog' },
+  { code: 'bn-BD', label: '🇧🇩 البنغالية (বাংলা)', promptName: 'Bengali' },
+
+  // اللغات الأوروبية والعالمية
+  { code: 'en-US', label: '🇺🇸 الإنجليزية (English)', promptName: 'English' },
+  { code: 'fr-FR', label: '🇫🇷 الفرنسية (Français)', promptName: 'French' },
+  { code: 'es-ES', label: '🇪🇸 الإسبانية (Español)', promptName: 'Spanish' },
+  { code: 'tr-TR', label: '🇹🇷 التركية (Türkçe)', promptName: 'Turkish' },
+  { code: 'nl-NL', label: '🇳🇱 الهولندية (Nederlands)', promptName: 'Dutch' },
+  { code: 'pt-PT', label: '🇵🇹 البرتغالية (Português)', promptName: 'Portuguese' },
+  { code: 'de-DE', label: '🇩🇪 الألمانية (Deutsch)', promptName: 'German' },
+  { code: 'it-IT', label: '🇮🇹 الإيطالية (Italiano)', promptName: 'Italian' },
+  { code: 'ru-RU', label: '🇷🇺 الروسية (Русский)', promptName: 'Russian' },
+  { code: 'uk-UA', label: '🇺🇦 الأوكرانية (Українська)', promptName: 'Ukrainian' },
+  { code: 'pl-PL', label: '🇵🇱 البولندية (Polski)', promptName: 'Polish' },
+  { code: 'sv-SE', label: '🇸🇪 السويدية (Svenska)', promptName: 'Swedish' },
+  { code: 'el-GR', label: '🇬🇷 اليونانية (Ελληνικά)', promptName: 'Greek' },
+  { code: 'ro-RO', label: '🇷🇴 الرومانية (Română)', promptName: 'Romanian' },
+  { code: 'fa-IR', label: '🇮🇷 الفارسية (فارسی)', promptName: 'Persian' },
+
+  // اللغات الإفريقية
+  { code: 'sw-KE', label: '🇰🇪 السواحيلية (Kiswahili)', promptName: 'Swahili' },
+  { code: 'ha-NG', label: '🇳🇬 الهوسا (Hausa)', promptName: 'Hausa' },
+];
+
 export default function App() {
   const [langUser, setLangUser] = useState('ar-MA');
-  const [langGuest, setLangGuest] = useState('en-US');
+  const [langGuest, setLangGuest] = useState('ja-JP');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [liveTranscript, setLiveTranscript] = useState('');
   const [history, setHistory] = useState<ConversationSession[]>(() => {
     try {
       const saved = localStorage.getItem('translator_history_v1');
@@ -30,7 +76,6 @@ export default function App() {
   const [showHistory, setShowHistory] = useState(false);
   const [isRecordingUser, setIsRecordingUser] = useState(false);
   const [isRecordingGuest, setIsRecordingGuest] = useState(false);
-  const [isTranslating, setIsTranslating] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [camTranslation, setCamTranslation] = useState('');
@@ -58,7 +103,6 @@ export default function App() {
     }
   }, [history]);
 
-  // مسح الشاشة تلقائياً بعد 45 ثانية من انتهاء الكلام ونقل المحادثة للسجل
   useEffect(() => {
     if (messages.length === 0) return;
     if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
@@ -88,11 +132,18 @@ export default function App() {
     setMessages([]);
   };
 
-  // دالة نطق صوتي مضمونة 100% لجميع اللغات (صينية، ألمانية، إنجليزية، عربية...)
-  const speakText = (text: string, lang: string) => {
-    if (!text) return;
+  const getPromptLangName = (code: string) => {
+    return ALL_LANGUAGES.find((l) => l.code === code)?.promptName || code;
+  };
 
-    // إيقاف أي صوت شغال حالياً
+  const getRecognitionLang = (code: string) => {
+    if (code === 'ar-001') return 'ar-SA';
+    return code;
+  };
+
+  const speakText = async (text: string, lang: string) => {
+    if (!text || text.startsWith('⚡')) return;
+
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }
@@ -101,37 +152,36 @@ export default function App() {
       audioRef.current = null;
     }
 
-    const cleanText = text.replace(/[؟?!.,。،]/g, ' ').trim();
-    if (!cleanText) return;
+    const ttsLang = lang.startsWith('ar') ? 'ar-SA' : lang;
 
-    const ttsLang = lang === 'ar-MA' ? 'ar-SA' : lang;
-    const shortLang = ttsLang.split('-')[0].toLowerCase();
+    try {
+      const res = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'tts',
+          text,
+          lang: ttsLang,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.audioBase64) {
+          const audio = new Audio(data.audioBase64);
+          audioRef.current = audio;
+          await audio.play();
+          return;
+        }
+      }
+    } catch {
+      // احتياطي: النطق المحلي من الهاتف
+    }
 
-    // التحقق واش الهاتف فيه صوت محلي لهذه اللغة
-    const voices = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [];
-    const matchedVoice =
-      voices.find((v) => v.lang.toLowerCase() === ttsLang.toLowerCase()) ||
-      voices.find((v) => v.lang.toLowerCase().startsWith(shortLang));
-
-    if (matchedVoice && 'speechSynthesis' in window) {
+    if ('speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = ttsLang;
-      utterance.voice = matchedVoice;
       utterance.rate = 0.95;
       window.speechSynthesis.speak(utterance);
-    } else {
-      // تشغيل الصوت السحابي مباشرة إذا لم يكن مثبتاً في الهاتف (يحل مشكل الصينية والألمانية)
-      const encoded = encodeURIComponent(text.slice(0, 200));
-      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encoded}&tl=${shortLang}&client=tw-ob`;
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
-      audio.play().catch(() => {
-        if ('speechSynthesis' in window) {
-          const fallback = new SpeechSynthesisUtterance(text);
-          fallback.lang = ttsLang;
-          window.speechSynthesis.speak(fallback);
-        }
-      });
     }
   };
 
@@ -150,68 +200,92 @@ export default function App() {
 
     const recognition = new SpeechRecognition();
     const activeLang = sender === 'user' ? langUser : langGuest;
-    recognition.lang = activeLang;
-    recognition.interimResults = false;
+    recognition.lang = getRecognitionLang(activeLang);
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
+    setLiveTranscript('');
     if (sender === 'user') setIsRecordingUser(true);
     else setIsRecordingGuest(true);
 
-    recognition.onresult = async (event: any) => {
-      const speechText = event.results[0][0].transcript;
+    let finalTranscript = '';
+
+    recognition.onresult = (event: any) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      setLiveTranscript(finalTranscript || interim);
+    };
+
+    recognition.onend = async () => {
+      setIsRecordingUser(false);
+      setIsRecordingGuest(false);
+
+      const speechText = (finalTranscript || liveTranscript).trim();
+      setLiveTranscript('');
+
+      if (!speechText) return;
+
       const sourceLang = sender === 'user' ? langUser : langGuest;
       const targetLang = sender === 'user' ? langGuest : langUser;
+      const msgId = Date.now().toString();
 
-      setIsTranslating(true);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: msgId,
+          sender,
+          text: speechText,
+          translation: '⚡ جاري الترجمة...',
+          timestamp: new Date().toLocaleTimeString([], {
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          sourceLang,
+          targetLang,
+        },
+      ]);
+
       try {
         const response = await fetch('/api/translate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             text: speechText,
-            source: sourceLang,
-            target:
-              targetLang === 'ar-MA'
-                ? 'Moroccan Darija written strictly in Arabic script (not Latin)'
-                : targetLang,
-            mode: 'محادثة صوتية فورية',
+            source: getPromptLangName(sourceLang),
+            target: getPromptLangName(targetLang),
           }),
         });
         const data = await response.json();
         const translationText =
           data.translation || 'خطأ: تأكد من إضافة GEMINI_API_KEY في Vercel';
 
-        setMessages((prev) => [
-          ...prev,
-          {
-            sender,
-            text: speechText,
-            translation: translationText,
-            timestamp: new Date().toLocaleTimeString([], {
-              hour: '2-digit',
-              minute: '2-digit',
-            }),
-            sourceLang,
-            targetLang,
-          },
-        ]);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId ? { ...m, translation: translationText } : m
+          )
+        );
 
         speakText(translationText, targetLang);
       } catch {
-        alert('تعذر الاتصال بالخادم للترجمة.');
-      } finally {
-        setIsTranslating(false);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId ? { ...m, translation: 'تعذر الاتصال بالخادم.' } : m
+          )
+        );
       }
-    };
-
-    recognition.onend = () => {
-      setIsRecordingUser(false);
-      setIsRecordingGuest(false);
     };
 
     recognition.onerror = () => {
       setIsRecordingUser(false);
       setIsRecordingGuest(false);
+      setLiveTranscript('');
     };
 
     recognition.start();
@@ -257,8 +331,7 @@ export default function App() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               image: imageData,
-              target: langUser,
-              mode: 'ترجمة بصرية بالكاميرا OCR',
+              target: getPromptLangName(langUser),
             }),
           });
           const data = await response.json();
@@ -290,7 +363,7 @@ export default function App() {
               المترجم الذكي الفوري
             </h1>
             <p className="text-[10px] text-slate-400">
-              صوت فوري • كاميرا • سجل محفوظ
+              34 لغة ولهجة عالمية • صوت • كاميرا
             </p>
           </div>
         </div>
@@ -299,7 +372,6 @@ export default function App() {
           {messages.length > 0 && (
             <button
               onClick={archiveCurrentCall}
-              title="إنهاء المحادثة وحفظها في السجل"
               className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 rounded-xl text-[11px] font-bold transition"
             >
               ✓ إنهاء وحفظ
@@ -329,20 +401,20 @@ export default function App() {
 
       {/* ساحة المحادثة */}
       <main className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {messages.length === 0 ? (
+        {messages.length === 0 && !liveTranscript ? (
           <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 py-14">
             <div className="text-4xl mb-3 opacity-60">🎙️</div>
             <p className="text-sm font-medium text-slate-300">
               ابدأ المحادثة الفورية الآن
             </p>
             <p className="text-xs text-slate-500 mt-1 max-w-xs">
-              اضغط على زر الميكروفون وتكلم، وسيتم النطق بالترجمة فوراً وحفظ المحادثة في السجل بعد الانتهاء
+              اختر من بين 34 لغة ولهجة (اليابانية، الكورية، الهندية، الخليجية، المصرية، الدارجة...) وتحدث فوراً
             </p>
           </div>
         ) : (
-          messages.map((msg, idx) => (
+          messages.map((msg) => (
             <div
-              key={idx}
+              key={msg.id}
               className={`flex flex-col max-w-[85%] ${
                 msg.sender === 'user'
                   ? 'mr-auto items-start'
@@ -361,22 +433,32 @@ export default function App() {
                 </p>
                 <p className="text-sm">{msg.text}</p>
                 <div className="mt-2 pt-2 border-t border-slate-800 text-sm text-white font-bold flex items-center justify-between gap-3">
-                  <span>{msg.translation}</span>
-                  <button
-                    onClick={() => speakText(msg.translation, msg.targetLang)}
-                    className="p-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 rounded-lg text-xs shrink-0"
+                  <span
+                    className={
+                      msg.translation.startsWith('⚡')
+                        ? 'text-xs text-blue-300 animate-pulse font-normal'
+                        : ''
+                    }
                   >
-                    🔊
-                  </button>
+                    {msg.translation}
+                  </span>
+                  {!msg.translation.startsWith('⚡') && (
+                    <button
+                      onClick={() => speakText(msg.translation, msg.targetLang)}
+                      className="p-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 rounded-lg text-xs shrink-0"
+                    >
+                      🔊
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
           ))
         )}
 
-        {isTranslating && (
-          <div className="text-center text-xs text-blue-400 animate-pulse py-2">
-            ⚡ جاري الترجمة الفورية...
+        {liveTranscript && (
+          <div className="p-3 rounded-2xl bg-slate-800/80 border border-blue-500/40 text-sm text-blue-200 animate-pulse">
+            🎙️ {liveTranscript}...
           </div>
         )}
       </main>
@@ -526,12 +608,11 @@ export default function App() {
               onChange={(e) => setLangUser(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white"
             >
-              <option value="ar-MA">العربية (المغرب)</option>
-              <option value="ar-SA">العربية الفصحى</option>
-              <option value="fr-FR">الفرنسية</option>
-              <option value="en-US">الإنجليزية</option>
-              <option value="es-ES">الإسبانية</option>
-              <option value="de-DE">الألمانية</option>
+              {ALL_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
             </select>
           </div>
           <div>
@@ -543,12 +624,11 @@ export default function App() {
               onChange={(e) => setLangGuest(e.target.value)}
               className="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white"
             >
-              <option value="en-US">الإنجليزية</option>
-              <option value="fr-FR">الفرنسية</option>
-              <option value="zh-CN">الصينية (中文)</option>
-              <option value="es-ES">الإسبانية</option>
-              <option value="de-DE">الألمانية</option>
-              <option value="ar-MA">العربية (المغرب)</option>
+              {ALL_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
             </select>
           </div>
         </div>
