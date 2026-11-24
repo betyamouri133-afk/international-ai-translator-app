@@ -56,14 +56,15 @@ const ALL_LANGUAGES = [
   { code: 'ha-NG', label: '🇳🇬 الهوسا (Hausa)', promptName: 'Hausa' },
 ];
 
-// ملف صوتي صامت لفك قفل الصوت في متصفح الموبايل عند الضغط على الزر
 const SILENT_AUDIO =
   'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
 
 export default function App() {
   const [langUser, setLangUser] = useState('ar-MA');
-  const [langGuest, setLangGuest] = useState('ja-JP');
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [langGuest, setLangGuest] = useState('ru-RU');
+  // عرض بطاقة واحدة نظيفة في الشاشة تتبدل تلقائياً مع كل جملة جديدة
+  const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
+  const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
   const [liveTranscript, setLiveTranscript] = useState('');
   const [history, setHistory] = useState<ConversationSession[]>(() => {
     try {
@@ -84,10 +85,9 @@ export default function App() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const playerRef = useRef<HTMLAudioElement | null>(null);
-  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    // إنشاء مشغل صوتي واحد وإعادة استخدامه لتجاوز قيود Autoplay في الهاتف
     const audio = new Audio();
     audio.preload = 'auto';
     playerRef.current = audio;
@@ -108,18 +108,19 @@ export default function App() {
     }
   }, [history]);
 
+  // إخفاء الكتابة من الشاشة تلقائياً بعد 15 ثانية من السكوت وحفظ المحادثة في السجل
   useEffect(() => {
-    if (messages.length === 0) return;
-    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    if (!currentMessage || currentMessage.translation.startsWith('⚡')) return;
+    if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
 
-    inactivityTimerRef.current = setTimeout(() => {
-      archiveCurrentCall();
-    }, 45000);
+    autoClearTimerRef.current = setTimeout(() => {
+      clearScreenAndSave();
+    }, 15000);
 
     return () => {
-      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+      if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
     };
-  }, [messages]);
+  }, [currentMessage]);
 
   const unlockAudioInMobile = () => {
     if (playerRef.current) {
@@ -132,20 +133,25 @@ export default function App() {
     }
   };
 
-  const archiveCurrentCall = () => {
-    if (messages.length === 0) return;
-    const newSession: ConversationSession = {
-      id: Date.now().toString(),
-      date: new Date().toLocaleString('ar-MA', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-      }),
-      messages: [...messages],
-    };
-    setHistory((prev) => [newSession, ...prev]);
-    setMessages([]);
+  const clearScreenAndSave = () => {
+    setCurrentMessage(null);
+    setLiveTranscript('');
+    setSessionMessages((prev) => {
+      if (prev.length > 0) {
+        const newSession: ConversationSession = {
+          id: Date.now().toString(),
+          date: new Date().toLocaleString('ar-MA', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+          }),
+          messages: [...prev],
+        };
+        setHistory((h) => [newSession, ...h]);
+      }
+      return [];
+    });
   };
 
   const getPromptLangName = (code: string) => {
@@ -173,7 +179,6 @@ export default function App() {
     player.src = ttsUrl;
 
     player.onerror = () => {
-      // في حال تعذر السيرفر، نستعمل نطق الهاتف المحلي
       if ('speechSynthesis' in window) {
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = ttsLang;
@@ -193,7 +198,6 @@ export default function App() {
   };
 
   const startSpeechRecognition = (sender: 'user' | 'guest') => {
-    // فك قفل الصوت في متصفح الموبايل فوراً عند لمس الزر
     unlockAudioInMobile();
 
     const SpeechRecognition =
@@ -209,6 +213,8 @@ export default function App() {
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
+    // مسح الكتابة السابقة من الشاشة بمجرد بدء جملة جديدة
+    setCurrentMessage(null);
     setLiveTranscript('');
     if (sender === 'user') setIsRecordingUser(true);
     else setIsRecordingGuest(true);
@@ -241,21 +247,20 @@ export default function App() {
       const targetLang = sender === 'user' ? langGuest : langUser;
       const msgId = Date.now().toString();
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: msgId,
-          sender,
-          text: speechText,
-          translation: '⚡ جاري الترجمة...',
-          timestamp: new Date().toLocaleTimeString([], {
-            hour: '2-digit',
-            minute: '2-digit',
-          }),
-          sourceLang,
-          targetLang,
-        },
-      ]);
+      const pendingMsg: Message = {
+        id: msgId,
+        sender,
+        text: speechText,
+        translation: '⚡ جاري الترجمة...',
+        timestamp: new Date().toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+        }),
+        sourceLang,
+        targetLang,
+      };
+
+      setCurrentMessage(pendingMsg);
 
       try {
         const response = await fetch('/api/translate', {
@@ -271,19 +276,19 @@ export default function App() {
         const translationText =
           data.translation || 'خطأ: تأكد من إضافة GEMINI_API_KEY في Vercel';
 
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId ? { ...m, translation: translationText } : m
-          )
-        );
+        const completedMsg: Message = {
+          ...pendingMsg,
+          translation: translationText,
+        };
 
+        setCurrentMessage(completedMsg);
+        setSessionMessages((prev) => [...prev, completedMsg]);
         speakText(translationText, targetLang);
       } catch {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId ? { ...m, translation: 'تعذر الاتصال بالخادم.' } : m
-          )
-        );
+        setCurrentMessage({
+          ...pendingMsg,
+          translation: 'تعذر الاتصال بالخادم.',
+        });
       }
     };
 
@@ -356,42 +361,43 @@ export default function App() {
 
   return (
     <div
-      className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between pb-6 font-sans"
+      className="min-h-screen bg-gradient-to-b from-zinc-950 via-neutral-900 to-zinc-950 text-zinc-100 flex flex-col justify-between pb-6 font-sans"
       dir="rtl"
     >
-      {/* الترويسة */}
-      <header className="p-3.5 bg-slate-900 border-b border-slate-800 flex justify-between items-center shadow-lg">
+      {/* الترويسة بألوان الزمرد والذهبي الفخم */}
+      <header className="p-3.5 bg-zinc-900/90 backdrop-blur-md border-b border-emerald-500/20 flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-base shadow-md">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-zinc-950 flex items-center justify-center font-extrabold text-base shadow-md shadow-emerald-500/20">
             AI
           </div>
           <div>
             <h1 className="text-sm font-bold text-white leading-tight">
               المترجم الذكي الفوري
             </h1>
-            <p className="text-[10px] text-slate-400">
-              34 لغة ولهجة عالمية • صوت • كاميرا
+            <p className="text-[10px] text-emerald-400/90">
+              34 لغة ولهجة • شاشة ذكية نظيفة
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5">
-          {messages.length > 0 && (
+          {(currentMessage || sessionMessages.length > 0) && (
             <button
-              onClick={archiveCurrentCall}
-              className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 rounded-xl text-[11px] font-bold transition"
+              onClick={clearScreenAndSave}
+              title="مسح الشاشة وحفظ في السجل"
+              className="px-2.5 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 border border-emerald-500/40 rounded-xl text-[11px] font-bold transition"
             >
-              ✓ إنهاء وحفظ
+              🧹 مسح وحفظ
             </button>
           )}
 
           <button
             onClick={() => setShowHistory(true)}
-            className="relative px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded-xl text-[11px] font-medium transition"
+            className="relative px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-amber-300 border border-zinc-700 rounded-xl text-[11px] font-medium transition"
           >
             🕒 السجل
             {history.length > 0 && (
-              <span className="mr-1 px-1.5 py-0.2 bg-amber-500 text-slate-950 rounded-full text-[9px] font-bold">
+              <span className="mr-1 px-1.5 py-0.2 bg-amber-400 text-zinc-950 rounded-full text-[9px] font-bold">
                 {history.length}
               </span>
             )}
@@ -399,102 +405,104 @@ export default function App() {
 
           <button
             onClick={openCamera}
-            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 rounded-xl text-[11px] font-medium transition"
+            className="px-2.5 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-teal-300 border border-zinc-700 rounded-xl text-[11px] font-medium transition"
           >
             📷
           </button>
         </div>
       </header>
 
-      {/* ساحة المحادثة */}
-      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
-        {messages.length === 0 && !liveTranscript ? (
-          <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 py-14">
-            <div className="text-4xl mb-3 opacity-60">🎙️</div>
-            <p className="text-sm font-medium text-slate-300">
-              ابدأ المحادثة الفورية الآن
-            </p>
-            <p className="text-xs text-slate-500 mt-1 max-w-xs">
-              اختر من بين 34 لغة ولهجة (اليابانية، الكورية، الهندية، الخليجية، المصرية، الدارجة...) وتحدث فوراً
-            </p>
-          </div>
-        ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex flex-col max-w-[85%] ${
-                msg.sender === 'user'
-                  ? 'mr-auto items-start'
-                  : 'ml-auto items-end'
-              }`}
-            >
-              <div
-                className={`p-3.5 rounded-2xl ${
-                  msg.sender === 'user'
-                    ? 'bg-blue-600/20 border border-blue-500/30 text-blue-100'
-                    : 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-100'
-                }`}
-              >
-                <p className="text-[10px] text-slate-400 mb-1">
-                  {msg.timestamp}
-                </p>
-                <p dir="auto" className="text-sm">
-                  {msg.text}
-                </p>
-                <div className="mt-2 pt-2 border-t border-slate-800 text-sm text-white font-bold flex items-center justify-between gap-3">
-                  <span
-                    dir="auto"
-                    className={
-                      msg.translation.startsWith('⚡')
-                        ? 'text-xs text-blue-300 animate-pulse font-normal'
-                        : ''
-                    }
-                  >
-                    {msg.translation}
-                  </span>
-                  {!msg.translation.startsWith('⚡') && (
-                    <button
-                      onClick={() => speakText(msg.translation, msg.targetLang)}
-                      className="p-2 bg-blue-600 hover:bg-blue-500 active:scale-95 rounded-lg text-xs shrink-0 shadow"
-                    >
-                      🔊
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-
-        {liveTranscript && (
+      {/* ساحة العرض النظيفة (تُظهر جملة واحدة واضحة وتُمسح تلقائياً) */}
+      <main className="flex-1 flex flex-col items-center justify-center px-4 py-4">
+        {liveTranscript ? (
           <div
             dir="auto"
-            className="p-3 rounded-2xl bg-slate-800/80 border border-blue-500/40 text-sm text-blue-200 animate-pulse"
+            className="w-full max-w-md p-5 rounded-3xl bg-zinc-900/90 border border-emerald-500/40 text-center text-base text-emerald-300 animate-pulse shadow-xl"
           >
             🎙️ {liveTranscript}...
+          </div>
+        ) : currentMessage ? (
+          <div
+            className={`w-full max-w-md p-5 rounded-3xl shadow-2xl transition-all duration-300 ${
+              currentMessage.sender === 'user'
+                ? 'bg-gradient-to-br from-emerald-950/90 to-zinc-900 border border-emerald-500/40'
+                : 'bg-gradient-to-br from-amber-950/60 to-zinc-900 border border-amber-500/40'
+            }`}
+          >
+            <div className="flex justify-between items-center text-[11px] text-zinc-400 mb-2">
+              <span className="font-semibold text-emerald-400">
+                {currentMessage.sender === 'user' ? '● أنت' : '● الضيف'}
+              </span>
+              <span>{currentMessage.timestamp}</span>
+            </div>
+
+            {/* النص المنطوق */}
+            <p dir="auto" className="text-sm text-zinc-300 leading-relaxed mb-3">
+              {currentMessage.text}
+            </p>
+
+            {/* الترجمة بخط كبير وواضح */}
+            <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between gap-3">
+              <p
+                dir="auto"
+                className={`text-xl font-bold leading-snug ${
+                  currentMessage.translation.startsWith('⚡')
+                    ? 'text-sm text-emerald-300 animate-pulse font-normal'
+                    : 'text-white'
+                }`}
+              >
+                {currentMessage.translation}
+              </p>
+
+              {!currentMessage.translation.startsWith('⚡') && (
+                <button
+                  onClick={() =>
+                    speakText(
+                      currentMessage.translation,
+                      currentMessage.targetLang
+                    )
+                  }
+                  className="p-3 bg-gradient-to-tr from-emerald-500 to-teal-400 text-zinc-950 hover:opacity-90 active:scale-95 rounded-2xl text-base shrink-0 shadow-lg shadow-emerald-500/20 font-bold"
+                >
+                  🔊
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center text-center text-zinc-500 py-10">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-3xl mb-3">
+              🎙️
+            </div>
+            <p className="text-sm font-semibold text-zinc-200">
+              الشاشة جاهزة ونظيفة
+            </p>
+            <p className="text-xs text-zinc-500 mt-1 max-w-xs">
+              كل ترجمة جديدة تظهر هنا بوضوح وتُحفظ تلقائياً في السجل حتى تبقى الشاشة مريحة للعين
+            </p>
           </div>
         )}
       </main>
 
       {/* نافذة السجل */}
       {showHistory && (
-        <div className="fixed inset-0 bg-slate-950/95 z-50 flex flex-col p-4">
-          <div className="flex justify-between items-center border-b border-slate-800 pb-3">
-            <h2 className="text-base font-bold text-amber-400">
-              🕒 سجل المحادثات السابقة ({history.length})
+        <div className="fixed inset-0 bg-zinc-950/95 backdrop-blur-md z-50 flex flex-col p-4">
+          <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+            <h2 className="text-base font-bold text-amber-300">
+              🕒 سجل المحادثات المحفوظة ({history.length})
             </h2>
             <div className="flex items-center gap-2">
               {history.length > 0 && (
                 <button
                   onClick={() => setHistory([])}
-                  className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg text-xs"
+                  className="px-2.5 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs"
                 >
                   مسح الكل
                 </button>
               )}
               <button
                 onClick={() => setShowHistory(false)}
-                className="px-3 py-1 bg-slate-800 rounded-lg text-xs text-white"
+                className="px-3 py-1 bg-zinc-800 rounded-lg text-xs text-white"
               >
                 إغلاق ✕
               </button>
@@ -503,25 +511,25 @@ export default function App() {
 
           <div className="flex-1 overflow-y-auto py-4 space-y-4">
             {history.length === 0 ? (
-              <p className="text-center text-slate-500 text-sm py-20">
+              <p className="text-center text-zinc-500 text-sm py-20">
                 لا توجد محادثات محفوظة في السجل بعد.
               </p>
             ) : (
               history.map((session) => (
                 <div
                   key={session.id}
-                  className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2.5"
+                  className="bg-zinc-900 border border-zinc-800 rounded-2xl p-3.5 space-y-2.5"
                 >
-                  <div className="flex justify-between items-center text-[11px] text-slate-400 border-b border-slate-800 pb-1.5">
+                  <div className="flex justify-between items-center text-[11px] text-zinc-400 border-b border-zinc-800 pb-1.5">
                     <span>📅 {session.date}</span>
                     <span>{session.messages.length} جمل</span>
                   </div>
                   {session.messages.map((m, i) => (
                     <div
                       key={i}
-                      className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 space-y-1"
+                      className="bg-zinc-950 p-2.5 rounded-xl border border-zinc-800/80 space-y-1"
                     >
-                      <p dir="auto" className="text-xs text-slate-400">
+                      <p dir="auto" className="text-xs text-zinc-400">
                         {m.text}
                       </p>
                       <div className="flex justify-between items-center gap-2">
@@ -530,7 +538,7 @@ export default function App() {
                         </p>
                         <button
                           onClick={() => speakText(m.translation, m.targetLang)}
-                          className="p-1.5 bg-slate-800 rounded text-xs"
+                          className="p-1.5 bg-emerald-500/20 text-emerald-300 rounded text-xs"
                         >
                           🔊
                         </button>
@@ -555,7 +563,7 @@ export default function App() {
                 stream?.getTracks().forEach((track) => track.stop());
                 setCameraActive(false);
               }}
-              className="px-3 py-1 bg-slate-800 rounded-lg text-xs"
+              className="px-3 py-1 bg-zinc-800 rounded-lg text-xs"
             >
               إغلاق ✕
             </button>
@@ -564,11 +572,11 @@ export default function App() {
             ref={videoRef}
             autoPlay
             playsInline
-            className="flex-1 w-full rounded-2xl object-cover my-4 border border-slate-800"
+            className="flex-1 w-full rounded-2xl object-cover my-4 border border-zinc-800"
           ></video>
           <button
             onClick={captureAndTranslate}
-            className="w-16 h-16 bg-red-600 rounded-full border-4 border-white mx-auto flex items-center justify-center text-2xl shadow-lg"
+            className="w-16 h-16 bg-emerald-500 rounded-full border-4 border-white mx-auto flex items-center justify-center text-2xl shadow-lg"
           >
             📸
           </button>
@@ -578,12 +586,14 @@ export default function App() {
 
       {/* نتيجة ترجمة الكاميرا */}
       {capturedImage && (
-        <div className="mx-4 mb-4 p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
-          <div className="flex justify-between items-center border-b border-slate-800 pb-2">
-            <span className="text-xs font-bold text-blue-400">ترجمة الصورة</span>
+        <div className="mx-4 mb-4 p-4 bg-zinc-900 border border-emerald-500/30 rounded-2xl space-y-3">
+          <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
+            <span className="text-xs font-bold text-emerald-400">
+              ترجمة الصورة
+            </span>
             <button
               onClick={() => setCapturedImage(null)}
-              className="text-slate-400 text-xs"
+              className="text-zinc-400 text-xs"
             >
               إغلاق ✕
             </button>
@@ -594,17 +604,17 @@ export default function App() {
             className="w-full h-32 object-cover rounded-xl"
           />
           {isTranslatingCam ? (
-            <p className="text-xs text-center text-blue-400 py-2 animate-pulse">
+            <p className="text-xs text-center text-emerald-400 py-2 animate-pulse">
               جاري قراءة النص وترجمته...
             </p>
           ) : (
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center gap-2">
+            <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800 flex justify-between items-center gap-2">
               <p dir="auto" className="text-sm text-white font-medium">
                 {camTranslation}
               </p>
               <button
                 onClick={() => speakText(camTranslation, langUser)}
-                className="p-1.5 bg-slate-800 rounded-lg text-xs shrink-0"
+                className="p-1.5 bg-emerald-500 text-zinc-950 rounded-lg text-xs shrink-0 font-bold"
               >
                 🔊
               </button>
@@ -613,17 +623,17 @@ export default function App() {
         </div>
       )}
 
-      {/* التحكم السفلي */}
+      {/* التحكم السفلي بالألوان الجديدة */}
       <footer className="px-4 space-y-4">
-        <div className="grid grid-cols-2 gap-3 bg-slate-900 p-3 rounded-2xl border border-slate-800 text-xs">
+        <div className="grid grid-cols-2 gap-3 bg-zinc-900/90 p-3 rounded-2xl border border-zinc-800 text-xs shadow-lg">
           <div>
-            <label className="text-[10px] text-blue-400 block mb-1">
+            <label className="text-[10px] text-emerald-400 font-semibold block mb-1">
               لغتك (أنت):
             </label>
             <select
               value={langUser}
               onChange={(e) => setLangUser(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white"
+              className="w-full bg-zinc-950 border border-zinc-800 focus:border-emerald-500 p-2 rounded-xl text-white outline-none"
             >
               {ALL_LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
@@ -633,13 +643,13 @@ export default function App() {
             </select>
           </div>
           <div>
-            <label className="text-[10px] text-indigo-400 block mb-1">
+            <label className="text-[10px] text-amber-400 font-semibold block mb-1">
               لغة الطرف الآخر:
             </label>
             <select
               value={langGuest}
               onChange={(e) => setLangGuest(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white"
+              className="w-full bg-zinc-950 border border-zinc-800 focus:border-amber-500 p-2 rounded-xl text-white outline-none"
             >
               {ALL_LANGUAGES.map((l) => (
                 <option key={l.code} value={l.code}>
@@ -654,29 +664,29 @@ export default function App() {
           <div className="flex flex-col items-center gap-2">
             <button
               onClick={() => startSpeechRecognition('user')}
-              className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all shadow-lg ${
+              className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all shadow-xl ${
                 isRecordingUser
-                  ? 'bg-red-600 animate-pulse scale-95'
-                  : 'bg-blue-600 hover:bg-blue-500 active:scale-90'
+                  ? 'bg-rose-600 animate-pulse scale-95 shadow-rose-600/30'
+                  : 'bg-gradient-to-tr from-emerald-600 to-teal-500 hover:opacity-95 active:scale-90 shadow-emerald-600/30'
               }`}
             >
               {isRecordingUser ? '⏹️' : '🎙️'}
             </button>
-            <span className="text-xs font-bold text-blue-400">تحدث أنت</span>
+            <span className="text-xs font-bold text-emerald-400">تحدث أنت</span>
           </div>
 
           <div className="flex flex-col items-center gap-2">
             <button
               onClick={() => startSpeechRecognition('guest')}
-              className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all shadow-lg ${
+              className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all shadow-xl ${
                 isRecordingGuest
-                  ? 'bg-red-600 animate-pulse scale-95'
-                  : 'bg-indigo-600 hover:bg-indigo-500 active:scale-90'
+                  ? 'bg-rose-600 animate-pulse scale-95 shadow-rose-600/30'
+                  : 'bg-gradient-to-tr from-amber-500 to-orange-500 hover:opacity-95 active:scale-90 shadow-amber-500/30'
               }`}
             >
               {isRecordingGuest ? '⏹️' : '🎙️'}
             </button>
-            <span className="text-xs font-bold text-indigo-400">
+            <span className="text-xs font-bold text-amber-400">
               تحدث الضيف
             </span>
           </div>
