@@ -31,7 +31,7 @@ export default async function handler(req, res) {
       });
     }
 
-    const models = ['gemini-2.5-flash-lite', 'gemini-3.8-flash', 'gemini-3.0-flash'];
+    const models = ['gemini-3.8-flash', 'gemini-2.5-flash-lite'];
     let lastError = 'تعذر الاتصال';
 
     for (const model of models) {
