@@ -1,11 +1,36 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+
+interface Message {
+  sender: 'user' | 'guest';
+  text: string;
+  translation: string;
+  timestamp: string;
+  sourceLang: string;
+  targetLang: string;
+}
+
+interface ConversationSession {
+  id: string;
+  date: string;
+  messages: Message[];
+}
 
 export default function App() {
   const [langUser, setLangUser] = useState('ar-MA');
-  const [langGuest, setLangGuest] = useState('zh-CN');
-  const [messages, setMessages] = useState<{ sender: 'user' | 'guest'; text: string; translation: string; timestamp: string }[]>([]);
+  const [langGuest, setLangGuest] = useState('en-US');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [history, setHistory] = useState<ConversationSession[]>(() => {
+    try {
+      const saved = localStorage.getItem('translator_history_v1');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [showHistory, setShowHistory] = useState(false);
   const [isRecordingUser, setIsRecordingUser] = useState(false);
   const [isRecordingGuest, setIsRecordingGuest] = useState(false);
+  const [isTranslating, setIsTranslating] = useState(false);
   const [cameraActive, setCameraActive] = useState(false);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [camTranslation, setCamTranslation] = useState('');
@@ -13,17 +38,121 @@ export default function App() {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.getVoices();
+      window.speechSynthesis.onvoiceschanged = () => {
+        window.speechSynthesis.getVoices();
+      };
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('translator_history_v1', JSON.stringify(history));
+    } catch (e) {
+      console.error('Failed to save history', e);
+    }
+  }, [history]);
+
+  // مسح الشاشة تلقائياً بعد 45 ثانية من انتهاء الكلام ونقل المحادثة للسجل
+  useEffect(() => {
+    if (messages.length === 0) return;
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+
+    inactivityTimerRef.current = setTimeout(() => {
+      archiveCurrentCall();
+    }, 45000);
+
+    return () => {
+      if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    };
+  }, [messages]);
+
+  const archiveCurrentCall = () => {
+    if (messages.length === 0) return;
+    const newSession: ConversationSession = {
+      id: Date.now().toString(),
+      date: new Date().toLocaleString('ar-MA', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      }),
+      messages: [...messages],
+    };
+    setHistory((prev) => [newSession, ...prev]);
+    setMessages([]);
+  };
+
+  // دالة نطق صوتي مضمونة 100% لجميع اللغات (صينية، ألمانية، إنجليزية، عربية...)
+  const speakText = (text: string, lang: string) => {
+    if (!text) return;
+
+    // إيقاف أي صوت شغال حالياً
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+
+    const cleanText = text.replace(/[؟?!.,。،]/g, ' ').trim();
+    if (!cleanText) return;
+
+    const ttsLang = lang === 'ar-MA' ? 'ar-SA' : lang;
+    const shortLang = ttsLang.split('-')[0].toLowerCase();
+
+    // التحقق واش الهاتف فيه صوت محلي لهذه اللغة
+    const voices = 'speechSynthesis' in window ? window.speechSynthesis.getVoices() : [];
+    const matchedVoice =
+      voices.find((v) => v.lang.toLowerCase() === ttsLang.toLowerCase()) ||
+      voices.find((v) => v.lang.toLowerCase().startsWith(shortLang));
+
+    if (matchedVoice && 'speechSynthesis' in window) {
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = ttsLang;
+      utterance.voice = matchedVoice;
+      utterance.rate = 0.95;
+      window.speechSynthesis.speak(utterance);
+    } else {
+      // تشغيل الصوت السحابي مباشرة إذا لم يكن مثبتاً في الهاتف (يحل مشكل الصينية والألمانية)
+      const encoded = encodeURIComponent(text.slice(0, 200));
+      const audioUrl = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encoded}&tl=${shortLang}&client=tw-ob`;
+      const audio = new Audio(audioUrl);
+      audioRef.current = audio;
+      audio.play().catch(() => {
+        if ('speechSynthesis' in window) {
+          const fallback = new SpeechSynthesisUtterance(text);
+          fallback.lang = ttsLang;
+          window.speechSynthesis.speak(fallback);
+        }
+      });
+    }
+  };
 
   const startSpeechRecognition = (sender: 'user' | 'guest') => {
-    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if ('speechSynthesis' in window) {
+      const unlock = new SpeechSynthesisUtterance('');
+      window.speechSynthesis.speak(unlock);
+    }
+
+    const SpeechRecognition =
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("المتصفح لا يدعم تسجيل الصوت. يرجى استخدام Chrome أو Safari.");
+      alert('المتصفح لا يدعم تسجيل الصوت. يرجى استخدام Chrome أو Safari.');
       return;
     }
 
     const recognition = new SpeechRecognition();
-    recognition.lang = sender === 'user' ? langUser : langGuest;
+    const activeLang = sender === 'user' ? langUser : langGuest;
+    recognition.lang = activeLang;
     recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
 
     if (sender === 'user') setIsRecordingUser(true);
     else setIsRecordingGuest(true);
@@ -32,7 +161,8 @@ export default function App() {
       const speechText = event.results[0][0].transcript;
       const sourceLang = sender === 'user' ? langUser : langGuest;
       const targetLang = sender === 'user' ? langGuest : langUser;
-      
+
+      setIsTranslating(true);
       try {
         const response = await fetch('/api/translate', {
           method: 'POST',
@@ -40,22 +170,37 @@ export default function App() {
           body: JSON.stringify({
             text: speechText,
             source: sourceLang,
-            target: targetLang,
-            mode: 'محادثة صوتية فورية'
-          })
+            target:
+              targetLang === 'ar-MA'
+                ? 'Moroccan Darija written strictly in Arabic script (not Latin)'
+                : targetLang,
+            mode: 'محادثة صوتية فورية',
+          }),
         });
         const data = await response.json();
-        const translationText = data.translation || "خطأ: تأكد من إضافة GEMINI_API_KEY في Vercel";
+        const translationText =
+          data.translation || 'خطأ: تأكد من إضافة GEMINI_API_KEY في Vercel';
 
-        setMessages(prev => [...prev, {
-          sender,
-          text: speechText,
-          translation: translationText,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-        }]);
+        setMessages((prev) => [
+          ...prev,
+          {
+            sender,
+            text: speechText,
+            translation: translationText,
+            timestamp: new Date().toLocaleTimeString([], {
+              hour: '2-digit',
+              minute: '2-digit',
+            }),
+            sourceLang,
+            targetLang,
+          },
+        ]);
+
         speakText(translationText, targetLang);
-      } catch (err) {
-        alert("تعذر الاتصال بالخادم للترجمة.");
+      } catch {
+        alert('تعذر الاتصال بالخادم للترجمة.');
+      } finally {
+        setIsTranslating(false);
       }
     };
 
@@ -72,24 +217,19 @@ export default function App() {
     recognition.start();
   };
 
-  const speakText = (text: string, lang: string) => {
-    if (!window.speechSynthesis) return;
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = lang;
-    window.speechSynthesis.speak(utterance);
-  };
-
   const openCamera = async () => {
     setCameraActive(true);
     setCapturedImage(null);
     setCamTranslation('');
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'environment' },
+      });
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-    } catch (err) {
-      alert("لا يمكن الوصول إلى الكاميرا.");
+    } catch {
+      alert('لا يمكن الوصول إلى الكاميرا.');
       setCameraActive(false);
     }
   };
@@ -103,11 +243,11 @@ export default function App() {
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const imageData = canvas.toDataURL('image/jpeg');
+        const imageData = canvas.toDataURL('image/jpeg', 0.8);
         setCapturedImage(imageData);
 
         const stream = video.srcObject as MediaStream;
-        stream?.getTracks().forEach(track => track.stop());
+        stream?.getTracks().forEach((track) => track.stop());
         setCameraActive(false);
 
         setIsTranslatingCam(true);
@@ -118,13 +258,15 @@ export default function App() {
             body: JSON.stringify({
               image: imageData,
               target: langUser,
-              mode: 'ترجمة بصرية بالكاميرا OCR'
-            })
+              mode: 'ترجمة بصرية بالكاميرا OCR',
+            }),
           });
           const data = await response.json();
-          setCamTranslation(data.translation || "لم يتم العثور على نص واضح.");
-        } catch (err) {
-          setCamTranslation("فشلت ترجمة الصورة.");
+          const result = data.translation || 'لم يتم العثور على نص واضح.';
+          setCamTranslation(result);
+          speakText(result, langUser);
+        } catch {
+          setCamTranslation('فشلت ترجمة الصورة.');
         } finally {
           setIsTranslatingCam(false);
         }
@@ -133,39 +275,97 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between pb-6 font-sans" dir="rtl">
+    <div
+      className="min-h-screen bg-slate-950 text-slate-100 flex flex-col justify-between pb-6 font-sans"
+      dir="rtl"
+    >
       {/* الترويسة */}
-      <header className="p-4 bg-slate-900 border-b border-slate-800 flex justify-between items-center shadow-lg">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-lg shadow-md">AI</div>
+      <header className="p-3.5 bg-slate-900 border-b border-slate-800 flex justify-between items-center shadow-lg">
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-base shadow-md">
+            AI
+          </div>
           <div>
-            <h1 className="text-base font-bold text-white leading-tight">المترجم الذكي الفوري</h1>
-            <p className="text-[10px] text-slate-400">محادثات صوتية وترجمة بالكاميرا</p>
+            <h1 className="text-sm font-bold text-white leading-tight">
+              المترجم الذكي الفوري
+            </h1>
+            <p className="text-[10px] text-slate-400">
+              صوت فوري • كاميرا • سجل محفوظ
+            </p>
           </div>
         </div>
-        <button onClick={openCamera} className="flex items-center gap-2 px-3.5 py-2 bg-slate-800 hover:bg-slate-700 active:scale-95 transition-all text-xs font-medium rounded-xl text-blue-400 border border-slate-700">
-          <span>📷</span>
-          <span>الكاميرا</span>
-        </button>
+
+        <div className="flex items-center gap-1.5">
+          {messages.length > 0 && (
+            <button
+              onClick={archiveCurrentCall}
+              title="إنهاء المحادثة وحفظها في السجل"
+              className="px-2.5 py-1.5 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 border border-emerald-500/40 rounded-xl text-[11px] font-bold transition"
+            >
+              ✓ إنهاء وحفظ
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowHistory(true)}
+            className="relative px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-slate-700 rounded-xl text-[11px] font-medium transition"
+          >
+            🕒 السجل
+            {history.length > 0 && (
+              <span className="mr-1 px-1.5 py-0.2 bg-amber-500 text-slate-950 rounded-full text-[9px] font-bold">
+                {history.length}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={openCamera}
+            className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-blue-400 border border-slate-700 rounded-xl text-[11px] font-medium transition"
+          >
+            📷
+          </button>
+        </div>
       </header>
 
       {/* ساحة المحادثة */}
-      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <main className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 py-16">
-            <div className="text-4xl mb-3 opacity-50">🎙️</div>
-            <p className="text-sm font-medium text-slate-300">ابدأ المحادثة الفورية الآن</p>
-            <p className="text-xs text-slate-500 mt-1 max-w-xs">اضغط على زر الميكروفون الخاص بك وتكلم، وسيقوم الذكاء الاصطناعي بالترجمة والنطق فوراً</p>
+          <div className="h-full flex flex-col items-center justify-center text-center text-slate-500 py-14">
+            <div className="text-4xl mb-3 opacity-60">🎙️</div>
+            <p className="text-sm font-medium text-slate-300">
+              ابدأ المحادثة الفورية الآن
+            </p>
+            <p className="text-xs text-slate-500 mt-1 max-w-xs">
+              اضغط على زر الميكروفون وتكلم، وسيتم النطق بالترجمة فوراً وحفظ المحادثة في السجل بعد الانتهاء
+            </p>
           </div>
         ) : (
           messages.map((msg, idx) => (
-            <div key={idx} className={`flex flex-col max-w-[85%] ${msg.sender === 'user' ? 'mr-auto items-start' : 'ml-auto items-end'}`}>
-              <div className={`p-3.5 rounded-2xl ${msg.sender === 'user' ? 'bg-blue-600/20 border border-blue-500/30 text-blue-100' : 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-100'}`}>
-                <p className="text-[10px] text-slate-400 mb-1">{msg.timestamp}</p>
+            <div
+              key={idx}
+              className={`flex flex-col max-w-[85%] ${
+                msg.sender === 'user'
+                  ? 'mr-auto items-start'
+                  : 'ml-auto items-end'
+              }`}
+            >
+              <div
+                className={`p-3.5 rounded-2xl ${
+                  msg.sender === 'user'
+                    ? 'bg-blue-600/20 border border-blue-500/30 text-blue-100'
+                    : 'bg-indigo-600/20 border border-indigo-500/30 text-indigo-100'
+                }`}
+              >
+                <p className="text-[10px] text-slate-400 mb-1">
+                  {msg.timestamp}
+                </p>
                 <p className="text-sm">{msg.text}</p>
                 <div className="mt-2 pt-2 border-t border-slate-800 text-sm text-white font-bold flex items-center justify-between gap-3">
                   <span>{msg.translation}</span>
-                  <button onClick={() => speakText(msg.translation, msg.sender === 'user' ? langGuest : langUser)} className="p-1.5 bg-slate-800 rounded-lg text-xs">
+                  <button
+                    onClick={() => speakText(msg.translation, msg.targetLang)}
+                    className="p-1.5 bg-slate-800 hover:bg-slate-700 active:scale-95 rounded-lg text-xs shrink-0"
+                  >
                     🔊
                   </button>
                 </div>
@@ -173,21 +373,106 @@ export default function App() {
             </div>
           ))
         )}
+
+        {isTranslating && (
+          <div className="text-center text-xs text-blue-400 animate-pulse py-2">
+            ⚡ جاري الترجمة الفورية...
+          </div>
+        )}
       </main>
+
+      {/* نافذة السجل */}
+      {showHistory && (
+        <div className="fixed inset-0 bg-slate-950/95 z-50 flex flex-col p-4">
+          <div className="flex justify-between items-center border-b border-slate-800 pb-3">
+            <h2 className="text-base font-bold text-amber-400">
+              🕒 سجل المحادثات السابقة ({history.length})
+            </h2>
+            <div className="flex items-center gap-2">
+              {history.length > 0 && (
+                <button
+                  onClick={() => setHistory([])}
+                  className="px-2.5 py-1 bg-red-600/20 text-red-400 border border-red-500/30 rounded-lg text-xs"
+                >
+                  مسح الكل
+                </button>
+              )}
+              <button
+                onClick={() => setShowHistory(false)}
+                className="px-3 py-1 bg-slate-800 rounded-lg text-xs text-white"
+              >
+                إغلاق ✕
+              </button>
+            </div>
+          </div>
+
+          <div className="flex-1 overflow-y-auto py-4 space-y-4">
+            {history.length === 0 ? (
+              <p className="text-center text-slate-500 text-sm py-20">
+                لا توجد محادثات محفوظة في السجل بعد.
+              </p>
+            ) : (
+              history.map((session) => (
+                <div
+                  key={session.id}
+                  className="bg-slate-900 border border-slate-800 rounded-2xl p-3.5 space-y-2.5"
+                >
+                  <div className="flex justify-between items-center text-[11px] text-slate-400 border-b border-slate-800 pb-1.5">
+                    <span>📅 {session.date}</span>
+                    <span>{session.messages.length} جمل</span>
+                  </div>
+                  {session.messages.map((m, i) => (
+                    <div
+                      key={i}
+                      className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/80 space-y-1"
+                    >
+                      <p className="text-xs text-slate-400">{m.text}</p>
+                      <div className="flex justify-between items-center gap-2">
+                        <p className="text-sm font-bold text-white">
+                          {m.translation}
+                        </p>
+                        <button
+                          onClick={() => speakText(m.translation, m.targetLang)}
+                          className="p-1 bg-slate-800 rounded text-xs"
+                        >
+                          🔊
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
 
       {/* واجهة الكاميرا */}
       {cameraActive && (
         <div className="fixed inset-0 bg-black z-50 flex flex-col justify-between p-4">
           <div className="flex justify-between items-center text-white">
             <span className="text-xs font-semibold">وجه الكاميرا نحو النص</span>
-            <button onClick={() => {
-              const stream = videoRef.current?.srcObject as MediaStream;
-              stream?.getTracks().forEach(track => track.stop());
-              setCameraActive(false);
-            }} className="px-3 py-1 bg-slate-800 rounded-lg text-xs">إغلاق ✕</button>
+            <button
+              onClick={() => {
+                const stream = videoRef.current?.srcObject as MediaStream;
+                stream?.getTracks().forEach((track) => track.stop());
+                setCameraActive(false);
+              }}
+              className="px-3 py-1 bg-slate-800 rounded-lg text-xs"
+            >
+              إغلاق ✕
+            </button>
           </div>
-          <video ref={videoRef} autoPlay playsInline className="flex-1 w-full rounded-2xl object-cover my-4 border border-slate-800"></video>
-          <button onClick={captureAndTranslate} className="w-16 h-16 bg-red-600 rounded-full border-4 border-white mx-auto flex items-center justify-center text-2xl shadow-lg">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            className="flex-1 w-full rounded-2xl object-cover my-4 border border-slate-800"
+          ></video>
+          <button
+            onClick={captureAndTranslate}
+            className="w-16 h-16 bg-red-600 rounded-full border-4 border-white mx-auto flex items-center justify-center text-2xl shadow-lg"
+          >
             📸
           </button>
           <canvas ref={canvasRef} className="hidden"></canvas>
@@ -199,14 +484,31 @@ export default function App() {
         <div className="mx-4 mb-4 p-4 bg-slate-900 border border-slate-800 rounded-2xl space-y-3">
           <div className="flex justify-between items-center border-b border-slate-800 pb-2">
             <span className="text-xs font-bold text-blue-400">ترجمة الصورة</span>
-            <button onClick={() => setCapturedImage(null)} className="text-slate-400 text-xs">إغلاق ✕</button>
+            <button
+              onClick={() => setCapturedImage(null)}
+              className="text-slate-400 text-xs"
+            >
+              إغلاق ✕
+            </button>
           </div>
-          <img src={capturedImage} alt="Captured" className="w-full h-32 object-cover rounded-xl" />
+          <img
+            src={capturedImage}
+            alt="Captured"
+            className="w-full h-32 object-cover rounded-xl"
+          />
           {isTranslatingCam ? (
-            <p className="text-xs text-center text-blue-400 py-2 animate-pulse">جاري قراءة النص وترجمته...</p>
+            <p className="text-xs text-center text-blue-400 py-2 animate-pulse">
+              جاري قراءة النص وترجمته...
+            </p>
           ) : (
-            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800">
+            <div className="bg-slate-950 p-3 rounded-xl border border-slate-800 flex justify-between items-center gap-2">
               <p className="text-sm text-white font-medium">{camTranslation}</p>
+              <button
+                onClick={() => speakText(camTranslation, langUser)}
+                className="p-1.5 bg-slate-800 rounded-lg text-xs shrink-0"
+              >
+                🔊
+              </button>
             </div>
           )}
         </div>
@@ -216,22 +518,37 @@ export default function App() {
       <footer className="px-4 space-y-4">
         <div className="grid grid-cols-2 gap-3 bg-slate-900 p-3 rounded-2xl border border-slate-800 text-xs">
           <div>
-            <label className="text-[10px] text-blue-400 block mb-1">لغتك (أنت):</label>
-            <select value={langUser} onChange={(e) => setLangUser(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white">
+            <label className="text-[10px] text-blue-400 block mb-1">
+              لغتك (أنت):
+            </label>
+            <select
+              value={langUser}
+              onChange={(e) => setLangUser(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white"
+            >
               <option value="ar-MA">العربية (المغرب)</option>
+              <option value="ar-SA">العربية الفصحى</option>
               <option value="fr-FR">الفرنسية</option>
-              <option value="en-US">الإنجليزية</option>
-              <option value="es-ES">الإسبانية</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-[10px] text-indigo-400 block mb-1">لغة الطرف الآخر:</label>
-            <select value={langGuest} onChange={(e) => setLangGuest(e.target.value)} className="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white">
-              <option value="zh-CN">الصينية (中文)</option>
               <option value="en-US">الإنجليزية</option>
               <option value="es-ES">الإسبانية</option>
               <option value="de-DE">الألمانية</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] text-indigo-400 block mb-1">
+              لغة الطرف الآخر:
+            </label>
+            <select
+              value={langGuest}
+              onChange={(e) => setLangGuest(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-800 p-2 rounded-lg text-white"
+            >
+              <option value="en-US">الإنجليزية</option>
               <option value="fr-FR">الفرنسية</option>
+              <option value="zh-CN">الصينية (中文)</option>
+              <option value="es-ES">الإسبانية</option>
+              <option value="de-DE">الألمانية</option>
+              <option value="ar-MA">العربية (المغرب)</option>
             </select>
           </div>
         </div>
@@ -241,7 +558,9 @@ export default function App() {
             <button
               onClick={() => startSpeechRecognition('user')}
               className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all shadow-lg ${
-                isRecordingUser ? 'bg-red-600 animate-pulse scale-95' : 'bg-blue-600 hover:bg-blue-500 active:scale-90'
+                isRecordingUser
+                  ? 'bg-red-600 animate-pulse scale-95'
+                  : 'bg-blue-600 hover:bg-blue-500 active:scale-90'
               }`}
             >
               {isRecordingUser ? '⏹️' : '🎙️'}
@@ -253,12 +572,16 @@ export default function App() {
             <button
               onClick={() => startSpeechRecognition('guest')}
               className={`w-20 h-20 rounded-full flex items-center justify-center text-3xl transition-all shadow-lg ${
-                isRecordingGuest ? 'bg-red-600 animate-pulse scale-95' : 'bg-indigo-600 hover:bg-indigo-500 active:scale-90'
+                isRecordingGuest
+                  ? 'bg-red-600 animate-pulse scale-95'
+                  : 'bg-indigo-600 hover:bg-indigo-500 active:scale-90'
               }`}
             >
               {isRecordingGuest ? '⏹️' : '🎙️'}
             </button>
-            <span className="text-xs font-bold text-indigo-400">تحدث الضيف</span>
+            <span className="text-xs font-bold text-indigo-400">
+              تحدث الضيف
+            </span>
           </div>
         </div>
       </footer>
