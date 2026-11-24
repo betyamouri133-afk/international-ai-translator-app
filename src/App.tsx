@@ -61,8 +61,8 @@ const SILENT_AUDIO =
 
 export default function App() {
   const [langUser, setLangUser] = useState('ar-MA');
-  const [langGuest, setLangGuest] = useState('ru-RU');
-  // عرض بطاقة واحدة نظيفة في الشاشة تتبدل تلقائياً مع كل جملة جديدة
+  const [langGuest, setLangGuest] = useState('tr-TR');
+  const [camTargetLang, setCamTargetLang] = useState('ar-MA');
   const [currentMessage, setCurrentMessage] = useState<Message | null>(null);
   const [sessionMessages, setSessionMessages] = useState<Message[]>([]);
   const [liveTranscript, setLiveTranscript] = useState('');
@@ -108,7 +108,6 @@ export default function App() {
     }
   }, [history]);
 
-  // إخفاء الكتابة من الشاشة تلقائياً بعد 15 ثانية من السكوت وحفظ المحادثة في السجل
   useEffect(() => {
     if (!currentMessage || currentMessage.translation.startsWith('⚡')) return;
     if (autoClearTimerRef.current) clearTimeout(autoClearTimerRef.current);
@@ -213,7 +212,6 @@ export default function App() {
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
 
-    // مسح الكتابة السابقة من الشاشة بمجرد بدء جملة جديدة
     setCurrentMessage(null);
     setLiveTranscript('');
     if (sender === 'user') setIsRecordingUser(true);
@@ -301,8 +299,31 @@ export default function App() {
     recognition.start();
   };
 
+  const translateImageToLanguage = async (imageData: string, targetLangCode: string) => {
+    setIsTranslatingCam(true);
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image: imageData,
+          target: getPromptLangName(targetLangCode),
+        }),
+      });
+      const data = await response.json();
+      const result = data.translation || 'لم يتم العثور على نص واضح.';
+      setCamTranslation(result);
+      speakText(result, targetLangCode);
+    } catch {
+      setCamTranslation('فشلت ترجمة الصورة.');
+    } finally {
+      setIsTranslatingCam(false);
+    }
+  };
+
   const openCamera = async () => {
     unlockAudioInMobile();
+    setCamTargetLang(langUser);
     setCameraActive(true);
     setCapturedImage(null);
     setCamTranslation('');
@@ -336,25 +357,7 @@ export default function App() {
         stream?.getTracks().forEach((track) => track.stop());
         setCameraActive(false);
 
-        setIsTranslatingCam(true);
-        try {
-          const response = await fetch('/api/translate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              image: imageData,
-              target: getPromptLangName(langUser),
-            }),
-          });
-          const data = await response.json();
-          const result = data.translation || 'لم يتم العثور على نص واضح.';
-          setCamTranslation(result);
-          speakText(result, langUser);
-        } catch {
-          setCamTranslation('فشلت ترجمة الصورة.');
-        } finally {
-          setIsTranslatingCam(false);
-        }
+        await translateImageToLanguage(imageData, camTargetLang);
       }
     }
   };
@@ -364,7 +367,7 @@ export default function App() {
       className="min-h-screen bg-gradient-to-b from-zinc-950 via-neutral-900 to-zinc-950 text-zinc-100 flex flex-col justify-between pb-6 font-sans"
       dir="rtl"
     >
-      {/* الترويسة بألوان الزمرد والذهبي الفخم */}
+      {/* الترويسة */}
       <header className="p-3.5 bg-zinc-900/90 backdrop-blur-md border-b border-emerald-500/20 flex justify-between items-center shadow-lg">
         <div className="flex items-center gap-2.5">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-emerald-500 to-teal-400 text-zinc-950 flex items-center justify-center font-extrabold text-base shadow-md shadow-emerald-500/20">
@@ -412,7 +415,7 @@ export default function App() {
         </div>
       </header>
 
-      {/* ساحة العرض النظيفة (تُظهر جملة واحدة واضحة وتُمسح تلقائياً) */}
+      {/* ساحة العرض النظيفة */}
       <main className="flex-1 flex flex-col items-center justify-center px-4 py-4">
         {liveTranscript ? (
           <div
@@ -436,12 +439,10 @@ export default function App() {
               <span>{currentMessage.timestamp}</span>
             </div>
 
-            {/* النص المنطوق */}
             <p dir="auto" className="text-sm text-zinc-300 leading-relaxed mb-3">
               {currentMessage.text}
             </p>
 
-            {/* الترجمة بخط كبير وواضح */}
             <div className="pt-3 border-t border-zinc-800/80 flex items-center justify-between gap-3">
               <p
                 dir="auto"
@@ -552,18 +553,29 @@ export default function App() {
         </div>
       )}
 
-      {/* واجهة الكاميرا */}
+      {/* واجهة الكاميرا مع اختيار لغة الترجمة */}
       {cameraActive && (
         <div className="fixed inset-0 bg-black z-50 flex flex-col justify-between p-4">
-          <div className="flex justify-between items-center text-white">
-            <span className="text-xs font-semibold">وجه الكاميرا نحو النص</span>
+          <div className="flex justify-between items-center text-white gap-2">
+            <span className="text-xs font-semibold shrink-0">ترجم الصورة إلى:</span>
+            <select
+              value={camTargetLang}
+              onChange={(e) => setCamTargetLang(e.target.value)}
+              className="flex-1 bg-zinc-900 border border-emerald-500/40 p-1.5 rounded-xl text-xs text-white outline-none"
+            >
+              {ALL_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
             <button
               onClick={() => {
                 const stream = videoRef.current?.srcObject as MediaStream;
                 stream?.getTracks().forEach((track) => track.stop());
                 setCameraActive(false);
               }}
-              className="px-3 py-1 bg-zinc-800 rounded-lg text-xs"
+              className="px-3 py-1.5 bg-zinc-800 rounded-xl text-xs shrink-0"
             >
               إغلاق ✕
             </button>
@@ -584,16 +596,31 @@ export default function App() {
         </div>
       )}
 
-      {/* نتيجة ترجمة الكاميرا */}
+      {/* نتيجة ترجمة الكاميرا مع إمكانية تغيير اللغة فوراً */}
       {capturedImage && (
         <div className="mx-4 mb-4 p-4 bg-zinc-900 border border-emerald-500/30 rounded-2xl space-y-3">
-          <div className="flex justify-between items-center border-b border-zinc-800 pb-2">
-            <span className="text-xs font-bold text-emerald-400">
-              ترجمة الصورة
+          <div className="flex justify-between items-center border-b border-zinc-800 pb-2 gap-2">
+            <span className="text-xs font-bold text-emerald-400 shrink-0">
+              ترجمة الصورة إلى:
             </span>
+            <select
+              value={camTargetLang}
+              onChange={(e) => {
+                const newLang = e.target.value;
+                setCamTargetLang(newLang);
+                translateImageToLanguage(capturedImage, newLang);
+              }}
+              className="flex-1 bg-zinc-950 border border-zinc-800 p-1 rounded-lg text-[11px] text-white outline-none"
+            >
+              {ALL_LANGUAGES.map((l) => (
+                <option key={l.code} value={l.code}>
+                  {l.label}
+                </option>
+              ))}
+            </select>
             <button
               onClick={() => setCapturedImage(null)}
-              className="text-zinc-400 text-xs"
+              className="text-zinc-400 text-xs shrink-0"
             >
               إغلاق ✕
             </button>
@@ -601,7 +628,7 @@ export default function App() {
           <img
             src={capturedImage}
             alt="Captured"
-            className="w-full h-32 object-cover rounded-xl"
+            className="w-full h-28 object-cover rounded-xl"
           />
           {isTranslatingCam ? (
             <p className="text-xs text-center text-emerald-400 py-2 animate-pulse">
@@ -613,8 +640,8 @@ export default function App() {
                 {camTranslation}
               </p>
               <button
-                onClick={() => speakText(camTranslation, langUser)}
-                className="p-1.5 bg-emerald-500 text-zinc-950 rounded-lg text-xs shrink-0 font-bold"
+                onClick={() => speakText(camTranslation, camTargetLang)}
+                className="p-2 bg-emerald-500 text-zinc-950 rounded-lg text-xs shrink-0 font-bold"
               >
                 🔊
               </button>
@@ -623,7 +650,7 @@ export default function App() {
         </div>
       )}
 
-      {/* التحكم السفلي بالألوان الجديدة */}
+      {/* التحكم السفلي */}
       <footer className="px-4 space-y-4">
         <div className="grid grid-cols-2 gap-3 bg-zinc-900/90 p-3 rounded-2xl border border-zinc-800 text-xs shadow-lg">
           <div>
