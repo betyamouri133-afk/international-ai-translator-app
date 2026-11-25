@@ -16,10 +16,41 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
+          cache: 'npm'
 
       - name: Install dependencies
-        run: npm ci || npm install && npm install lucide-react --no-save
+        run: npm ci || npm install && npm install lucide-react @capacitor/core @capacitor/cli @capacitor/android --no-save
 
       - name: Build web app
         run: npx vite build
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Init and sync Capacitor Android
+        run: |
+          if [ ! -d "android" ]; then
+            npx cap init "AI Translator" "com.betyam.translator" --web-dir=dist
+            npx cap add android
+          fi
+          npx cap sync android
+
+      - name: Build APK with Gradle
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - name: Upload APK Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
