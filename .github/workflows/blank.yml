@@ -31,7 +31,13 @@ jobs:
           java-version: '17'
 
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        env:
+          ANDROID_HOME: /usr/local/lib/android/sdk
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses"
+          yes | sdkmanager --sdk_root="$ANDROID_HOME" --licenses >/dev/null 2>&1 || true
+          sdkmanager --sdk_root="$ANDROID_HOME" "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
       - name: Init and sync Capacitor Android
         run: |
@@ -40,6 +46,13 @@ jobs:
             npx cap add android
           fi
           npx cap sync android
+
+      - name: Add Permissions to AndroidManifest
+        run: |
+          MANIFEST="android/app/src/main/AndroidManifest.xml"
+          if [ -f "$MANIFEST" ]; then
+            sed -i 's/<\/manifest>/    <uses-permission android:name="android.permission.INTERNET" \/>\n    <uses-permission android:name="android.permission.RECORD_AUDIO" \/>\n    <uses-permission android:name="android.permission.CAMERA" \/>\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" \/>\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" \/>\n<\/manifest>/' "$MANIFEST"
+          fi
 
       - name: Build APK with Gradle
         run: |
